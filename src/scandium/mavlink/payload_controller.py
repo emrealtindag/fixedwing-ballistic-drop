@@ -2,244 +2,191 @@
 
 Payload drop servo controller using MAVLink commands.
 
-This module provides a PayloadReleaseStatus dataclass to track release state
-and a PayloadController class that issues MAV_CMD_DO_SET_SERVO commands to
-set a servo PWM for dropping payloads. The controller is defensive and will
-not resend commands for already-released payloads; it also handles several
-common transport interfaces (pymavlink connection, or a project MavlinkTransport
-wrapper exposing convenient methods).
+This module provides a PayloadController class that issues MAV_CMD_DO_SET_SERVO
+commands to set a servo PWM for dropping payloads. The controller is defensive,
+waits for COMMAND_ACK from the autopilot, and prevents duplicate releases.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
-import time
 import logging
+import time
+from typing import Any, Tuple
+
+from pymavlink import mavutil
 
 # MAVLink command id for setting a servo output
-MAV_CMD_DO_SET_SERVO = 183
+MAV_CMD_DO_SET_SERVO = mavutil.mavlink.MAV_CMD_DO_SET_SERVO
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class PayloadReleaseStatus:
-    """Status of payload releases.
-
-    Attributes
-    ----------
-    payload1_released: bool
-        True if payload 1 has been released.
-    payload2_released: bool
-        True if payload 2 has been released.
-    last_release_timestamp: float
-        Unix timestamp (seconds) of the last release event, 0.0 if none.
-    total_released_count: int
-        Total number of releases performed.
-    """
-
-    payload1_released: bool = False
-    payload2_released: bool = False
-    last_release_timestamp: float = 0.0
-    total_released_count: int = 0
 
 
 class PayloadController:
     """Controller to command servo outputs for payload release via MAVLink.
 
-    The controller accepts either a raw pymavlink connection or a project-specific
-    MavlinkTransport wrapper. It will attempt to use common interfaces found on
-    such objects to send a MAV_CMD_DO_SET_SERVO command or call convenience
-    methods if available.
-
     Parameters
     ----------
-    mav_transport: Any
-        MAVLink transport object. Expected to be one of:
-          - a pymavlink connection where `.mav.command_long_send` is available
-          - an object exposing `.command_long_send` directly
-          - a wrapper exposing `.set_servo(servo_channel, pwm)` or `.set_servo_pwm(...)`
+    mav_connection: pymavlink mavutil.mavlink_connection
+        Active pymavlink connection created with mavutil.mavlink_connection(...)
     servo_channel: int
         Servo channel (servo number) to command (default: 9).
     pwm_payload_1: int
         PWM value to send to release payload 1 (default: 1500).
     pwm_payload_2: int
         PWM value to send to release payload 2 (default: 2000).
+
+    Attributes
+    ----------
+    payload1_released: bool
+        True if payload1 has been successfully released (ack received).
+    payload2_released: bool
+        True if payload2 has been successfully released (ack received).
     """
 
     def __init__(
         self,
-        mav_transport: Any,
+        mav_connection: mavutil.mavlink_connection,
         servo_channel: int = 9,
         pwm_payload_1: int = 1500,
         pwm_payload_2: int = 2000,
     ) -> None:
-        self.transport = mav_transport
+        self.mav_connection = mav_connection
         self.servo_channel = int(servo_channel)
         self.pwm_payload_1 = int(pwm_payload_1)
         self.pwm_payload_2 = int(pwm_payload_2)
-        self._status = PayloadReleaseStatus()
 
-    @property
-    def status(self) -> PayloadReleaseStatus:
-        """Current release status snapshot."""
-        return self._status
+        # State flags to prevent duplicate releases
+        self.payload1_released: bool = False
+        self.payload2_released: bool = False
 
-    def _send_set_servo(self, pwm: int) -> bool:
-        """Send MAV_CMD_DO_SET_SERVO to the vehicle using available transport APIs.
+    def _wait_for_ack(self, command_id: int, timeout_s: float = 1.0) -> bool:
+        """Wait for a COMMAND_ACK for the given command_id.
 
-        Attempts multiple common interfaces and logs detailed errors. Returns
-        True if a send was attempted without raising an exception (note that
-        this does not guarantee the vehicle executed the command).
+        Non-blocking polling of the MAVLink port is used. The method returns True if a
+        COMMAND_ACK with command == command_id and result == MAV_RESULT_ACCEPTED is
+        received within timeout_s seconds. If a COMMAND_ACK is received with the same
+        command but a non-accepted result the method returns False immediately. If the
+        timeout expires without a matching ACK, returns False.
+
+        Args:
+            command_id: integer MAV command id to match in COMMAND_ACK.command
+            timeout_s: maximum time to wait (seconds)
+
+        Returns:
+            bool: True if ACK accepted, False otherwise
         """
-        # Defensive checks
-        pwm_val = int(pwm)
+        end_time = time.time() + float(timeout_s)
+        MAV_RESULT_ACCEPTED = mavutil.mavlink.MAV_RESULT_ACCEPTED
 
-        # 1) Try pymavlink-style connection with .mav.command_long_send
-        try:
-            mavobj = getattr(self.transport, "mav", None)
-            if mavobj is not None and hasattr(mavobj, "command_long_send"):
-                # Determine target system/component if provided on transport
-                target_system = getattr(self.transport, "target_system", 1)
-                target_component = getattr(self.transport, "target_component", 1)
-                # command_long_send(target_system, target_component, command, confirmation, p1..p7)
-                mavobj.command_long_send(
-                    int(target_system),
-                    int(target_component),
-                    MAV_CMD_DO_SET_SERVO,
-                    0,  # confirmation
-                    int(self.servo_channel),
-                    pwm_val,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                )
-                logger.debug("Sent MAV_CMD_DO_SET_SERVO via transport.mav.command_long_send: channel=%s pwm=%s",
-                             self.servo_channel, pwm_val)
-                return True
-        except Exception as exc:  # pragma: no cover - transport dependent
-            logger.exception("Failed sending set_servo via transport.mav.command_long_send: %s", exc)
+        while time.time() < end_time:
+            try:
+                msg = self.mav_connection.recv_match(type='COMMAND_ACK', blocking=False)
+            except Exception as exc:
+                logger.error("Error receiving COMMAND_ACK: %s", exc)
+                return False
 
-        # 2) Try direct command_long_send on the transport (some wrappers expose it)
-        try:
-            if hasattr(self.transport, "command_long_send"):
-                # signature expected: command_long_send(target_system, target_component, command, confirmation, p1..p7)
-                target_system = getattr(self.transport, "target_system", 1)
-                target_component = getattr(self.transport, "target_component", 1)
-                self.transport.command_long_send(
-                    int(target_system),
-                    int(target_component),
-                    MAV_CMD_DO_SET_SERVO,
-                    0,
-                    int(self.servo_channel),
-                    pwm_val,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                )
-                logger.debug("Sent MAV_CMD_DO_SET_SERVO via transport.command_long_send: channel=%s pwm=%s",
-                             self.servo_channel, pwm_val)
-                return True
-        except Exception as exc:  # pragma: no cover - transport dependent
-            logger.exception("Failed sending set_servo via transport.command_long_send: %s", exc)
+            if msg is None:
+                time.sleep(0.02)
+                continue
 
-        # 3) Try convenience methods often provided by wrappers
-        try:
-            if hasattr(self.transport, "set_servo"):
-                # set_servo(channel, pwm)
-                self.transport.set_servo(int(self.servo_channel), pwm_val)
-                logger.debug("Sent set_servo via transport.set_servo: channel=%s pwm=%s",
-                             self.servo_channel, pwm_val)
-                return True
-            if hasattr(self.transport, "set_servo_pwm"):
-                # set_servo_pwm(channel, pwm)
-                self.transport.set_servo_pwm(int(self.servo_channel), pwm_val)
-                logger.debug("Sent set_servo via transport.set_servo_pwm: channel=%s pwm=%s",
-                             self.servo_channel, pwm_val)
-                return True
-        except Exception as exc:  # pragma: no cover - transport dependent
-            logger.exception("Failed sending set_servo via convenience method: %s", exc)
+            # Extract fields defensively
+            try:
+                msg_command = int(getattr(msg, 'command', -1))
+                msg_result = int(getattr(msg, 'result', -1))
+            except Exception:
+                logger.warning("Malformed COMMAND_ACK message received: %s", msg)
+                continue
 
-        # 4) If no supported interface found, log and return False
-        logger.error(
-            "No supported MAVLink send interface found on transport to set servo (channel=%s pwm=%s)",
-            self.servo_channel,
-            pwm_val,
-        )
+            if msg_command != int(command_id):
+                logger.debug("Received COMMAND_ACK for other command (got=%s expected=%s)", msg_command, command_id)
+                continue
+
+            # Matching command_id
+            if msg_result == MAV_RESULT_ACCEPTED:
+                logger.info("Received COMMAND_ACK accepted for command %s", command_id)
+                return True
+
+            logger.warning("Received COMMAND_ACK for command %s but result=%s (not accepted)", command_id, msg_result)
+            return False
+
+        logger.warning("Timeout waiting for COMMAND_ACK for command %s", command_id)
         return False
 
-    def release_payload_1(self) -> bool:
-        """Release payload 1 by commanding the servo to pwm_payload_1.
+    def _send_set_servo(self, pwm: int) -> bool:
+        """Send MAV_CMD_DO_SET_SERVO to the vehicle using pymavlink API.
 
-        Returns True on successful command send and state update, False otherwise.
-        This method is idempotent: if payload1_released is already True it will
-        not resend the command.
+        Returns True if the send call completed without raising; this does not
+        guarantee the autopilot executed the command (ACK must be awaited).
         """
-        if self._status.payload1_released:
-            logger.info("Attempted to release payload 1 but it was already released.")
-            return False
-
         try:
-            ok = self._send_set_servo(self.pwm_payload_1)
-            if not ok:
-                logger.error("Failed to send release command for payload 1 (transport error)")
-                return False
+            tgt_sys = getattr(self.mav_connection, 'target_system', 0)
+            tgt_comp = getattr(self.mav_connection, 'target_component', 0)
 
-            # Update status
-            self._status.payload1_released = True
-            self._status.last_release_timestamp = time.time()
-            self._status.total_released_count += 1
-            logger.info("Payload 1 released: channel=%s pwm=%s", self.servo_channel, self.pwm_payload_1)
+            # command_long_send(target_system, target_component, command, confirmation, p1..p7)
+            # param1 = servo number, param2 = pwm
+            self.mav_connection.mav.command_long_send(
+                int(tgt_sys),
+                int(tgt_comp),
+                int(MAV_CMD_DO_SET_SERVO),
+                0,
+                float(self.servo_channel),
+                float(pwm),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            )
+            logger.info("Sent MAV_CMD_DO_SET_SERVO: channel=%s pwm=%s (tgt_sys=%s tgt_comp=%s)",
+                        self.servo_channel, pwm, tgt_sys, tgt_comp)
             return True
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Exception while releasing payload 1: %s", exc)
+        except Exception as exc:
+            logger.error("Failed to send MAV_CMD_DO_SET_SERVO: %s", exc)
             return False
+
+    def release_payload_1(self) -> bool:
+        """Release payload 1 by sending pwm_payload_1 to servo_channel and awaiting ACK.
+
+        Returns True if the command was sent and a positive COMMAND_ACK was received.
+        Prevents duplicate releases by checking payload1_released flag.
+        """
+        if self.payload1_released:
+            logger.info("release_payload_1 called but payload1 already released; skipping")
+            return False
+
+        sent = self._send_set_servo(self.pwm_payload_1)
+        if not sent:
+            logger.error("Failed to send servo command for payload1")
+            return False
+
+        ack_ok = self._wait_for_ack(MAV_CMD_DO_SET_SERVO)
+        if not ack_ok:
+            logger.error("Did not receive accepted COMMAND_ACK for payload1 release")
+            return False
+
+        self.payload1_released = True
+        logger.info("Payload1 release confirmed and flag set")
+        return True
 
     def release_payload_2(self) -> bool:
-        """Release payload 2 by commanding the servo to pwm_payload_2.
+        """Release payload 2 by sending pwm_payload_2 to servo_channel and awaiting ACK.
 
-        Returns True on successful command send and state update, False otherwise.
-        Idempotent: will not resend if payload2_released already True.
+        Returns True if the command was sent and a positive COMMAND_ACK was received.
+        Prevents duplicate releases by checking payload2_released flag.
         """
-        if self._status.payload2_released:
-            logger.info("Attempted to release payload 2 but it was already released.")
+        if self.payload2_released:
+            logger.info("release_payload_2 called but payload2 already released; skipping")
             return False
 
-        try:
-            ok = self._send_set_servo(self.pwm_payload_2)
-            if not ok:
-                logger.error("Failed to send release command for payload 2 (transport error)")
-                return False
-
-            # Update status
-            self._status.payload2_released = True
-            self._status.last_release_timestamp = time.time()
-            self._status.total_released_count += 1
-            logger.info("Payload 2 released: channel=%s pwm=%s", self.servo_channel, self.pwm_payload_2)
-            return True
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Exception while releasing payload 2: %s", exc)
+        sent = self._send_set_servo(self.pwm_payload_2)
+        if not sent:
+            logger.error("Failed to send servo command for payload2")
             return False
 
-    def reset_mechanism(self) -> bool:
-        """Reset the servo/mechanism to a safe locked PWM (1000).
-
-        Returns True if a reset command was sent, False otherwise.
-        Note: this does not modify payload1/2 released flags; it only commands the
-        servo to a lock position. Use with caution if hardware state requires
-        resetting flags as well.
-        """
-        try:
-            ok = self._send_set_servo(1000)
-            if not ok:
-                logger.error("Failed to send reset servo command (transport error)")
-                return False
-            logger.info("Sent reset servo command to PWM=1000 on channel %s", self.servo_channel)
-            return True
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Exception while resetting mechanism: %s", exc)
+        ack_ok = self._wait_for_ack(MAV_CMD_DO_SET_SERVO)
+        if not ack_ok:
+            logger.error("Did not receive accepted COMMAND_ACK for payload2 release")
             return False
+
+        self.payload2_released = True
+        logger.info("Payload2 release confirmed and flag set")
+        return True
