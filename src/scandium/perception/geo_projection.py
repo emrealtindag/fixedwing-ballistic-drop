@@ -16,7 +16,7 @@ Assumptions & coordinate conventions
      This permutation matrix is encoded in _CAM_TO_BODY_PERM.
   2. Apply camera mount rotation (mount_roll, mount_pitch). These are rotations of the camera with respect to the aircraft body.
      Both mount angles are given in degrees. Positive mount_pitch_deg means the camera is pitched downwards (i.e. points more towards the ground).
-  3. Apply the UAV attitude rotations (uav_roll_deg, uav_pitch_deg, yaw assumed zero). Positive roll is right-wing-down; positive pitch is nose-up.
+  3. Apply the UAV attitude rotations (uav_roll_deg, uav_pitch_deg, uav_yaw_deg). Positive roll is right-wing-down; positive pitch is nose-up; positive yaw rotates X->Y.
 
 - Intrinsics: `camera_matrix` is the 3x3 intrinsic matrix K. A pixel (u, v) is converted to a homogeneous ray in camera coordinates r_cam = inv(K) * [u, v, 1]^T.
 
@@ -35,7 +35,7 @@ Example
 >>> import numpy as np
 >>> K = np.array([[700, 0, 640],[0,700,360],[0,0,1]])
 >>> gp = GeoProjector(K, mount_pitch_deg=25.0, mount_roll_deg=0.0)
->>> gp.pixel_to_ground((640,360), altitude_agl_m=100.0, uav_roll_deg=0.0, uav_pitch_deg=0.0)
+>>> gp.pixel_to_ground((640,360), altitude_agl_m=100.0, uav_roll_deg=0.0, uav_pitch_deg=0.0, uav_yaw_deg=0.0)
 (0.0, some_value)
 
 """
@@ -133,7 +133,7 @@ class GeoProjector:
         self.R_mount_body_cam = R_mount_y @ R_mount_x @ _CAM_TO_BODY_PERM
 
     def pixel_to_ground(self, pixel_xy: Tuple[int, int], altitude_agl_m: float,
-                        uav_roll_deg: float = 0.0, uav_pitch_deg: float = 0.0) -> Tuple[float, float]:
+                        uav_roll_deg: float = 0.0, uav_pitch_deg: float = 0.0, uav_yaw_deg: float = 0.0) -> Tuple[float, float]:
         """Compute the ground intersection (X_forward_m, Y_lateral_m) for a pixel.
 
         Parameters
@@ -141,6 +141,7 @@ class GeoProjector:
         - altitude_agl_m: altitude above ground level in meters (positive).
         - uav_roll_deg: aircraft roll angle in degrees. Positive roll = right wing down.
         - uav_pitch_deg: aircraft pitch angle in degrees. Positive pitch = nose up.
+        - uav_yaw_deg: aircraft yaw/heading in degrees. Positive yaw rotates X -> Y.
 
         Returns
         - (X_forward_m, Y_lateral_m): intersection point in meters in the world frame where the camera
@@ -165,10 +166,10 @@ class GeoProjector:
         # First: body <- camera
         r_body = self.R_mount_body_cam @ r_cam
 
-        # Build UAV attitude rotation (body -> world). We assume yaw = 0 (unknown) and only use roll/pitch.
+        # Build UAV attitude rotation (body -> world). Use roll,pitch,yaw.
         roll_rad = _deg2rad(float(uav_roll_deg))
         pitch_rad = _deg2rad(float(uav_pitch_deg))
-        yaw_rad = 0.0
+        yaw_rad = _deg2rad(float(uav_yaw_deg))
 
         # R_world_body = R_z(yaw) @ R_y(pitch) @ R_x(roll)
         R_world_body = _rot_z(yaw_rad) @ _rot_y(pitch_rad) @ _rot_x(roll_rad)
