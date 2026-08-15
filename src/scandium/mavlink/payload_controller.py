@@ -33,6 +33,16 @@ class PayloadController:
         PWM value to send to release payload 1 (default: 1500).
     pwm_payload_2: int
         PWM value to send to release payload 2 (default: 2000).
+    require_arming: bool
+        If True, require vehicle to be armed (by HEARTBEAT base_mode) before sending release commands.
+    ack_retries: int
+        Number of times to retry waiting for an ACK before giving up.
+    ack_timeout_s: float
+        Timeout per ACK wait attempt in seconds.
+    target_system: int
+        MAVLink target system id to send commands to (overrides mav_connection.target_system if provided).
+    target_component: int
+        MAVLink target component id to send commands to (overrides mav_connection.target_component if provided).
 
     Attributes
     ----------
@@ -48,6 +58,11 @@ class PayloadController:
         servo_channel: int = 9,
         pwm_payload_1: int = 1500,
         pwm_payload_2: int = 2000,
+        require_arming: bool = True,
+        ack_retries: int = 2,
+        ack_timeout_s: float = 1.0,
+        target_system: int = 1,
+        target_component: int = 1,
     ) -> None:
         self.mav_connection = mav_connection
         self.servo_channel = int(servo_channel)
@@ -58,57 +73,115 @@ class PayloadController:
         self.payload1_released: bool = False
         self.payload2_released: bool = False
 
-    def _wait_for_ack(self, command_id: int, timeout_s: float = 1.0) -> bool:
-        """Wait for a COMMAND_ACK for the given command_id.
+        # New configuration options
+        self.require_arming: bool = bool(require_arming)
+        self.ack_retries: int = int(ack_retries)
+        self.ack_timeout_s: float = float(ack_timeout_s)
+        self.target_system: int = int(target_system)
+        self.target_component: int = int(target_component)
 
-        Non-blocking polling of the MAVLink port is used. The method returns True if a
-        COMMAND_ACK with command == command_id and result == MAV_RESULT_ACCEPTED is
-        received within timeout_s seconds. If a COMMAND_ACK is received with the same
-        command but a non-accepted result the method returns False immediately. If the
-        timeout expires without a matching ACK, returns False.
+    def _check_armed(self) -> bool:
+        """Check vehicle armed state using the latest HEARTBEAT.base_mode.
 
-        Args:
-            command_id: integer MAV command id to match in COMMAND_ACK.command
-            timeout_s: maximum time to wait (seconds)
-
-        Returns:
-            bool: True if ACK accepted, False otherwise
+        Returns True if the HEARTBEAT message indicates the vehicle is armed.
+        If no HEARTBEAT is available within a short window, returns False.
         """
-        end_time = time.time() + float(timeout_s)
-        MAV_RESULT_ACCEPTED = mavutil.mavlink.MAV_RESULT_ACCEPTED
+        MAV_MODE_FLAG_SAFETY_ARMED = getattr(mavutil.mavlink, "MAV_MODE_FLAG_SAFETY_ARMED", 0x80)
 
+        # Try briefly to read a heartbeat message (non-blocking polling with small timeout)
+        end_time = time.time() + 0.5  # short window to find a recent heartbeat
         while time.time() < end_time:
             try:
-                msg = self.mav_connection.recv_match(type='COMMAND_ACK', blocking=False)
+                msg = self.mav_connection.recv_match(type="HEARTBEAT", blocking=False)
             except Exception as exc:
-                logger.error("Error receiving COMMAND_ACK: %s", exc)
+                logger.error("Error receiving HEARTBEAT: %s", exc)
                 return False
 
             if msg is None:
                 time.sleep(0.02)
                 continue
 
-            # Extract fields defensively
             try:
-                msg_command = int(getattr(msg, 'command', -1))
-                msg_result = int(getattr(msg, 'result', -1))
+                base_mode = int(getattr(msg, "base_mode", 0))
             except Exception:
-                logger.warning("Malformed COMMAND_ACK message received: %s", msg)
-                continue
+                logger.warning("Malformed HEARTBEAT message received: %s", msg)
+                return False
 
-            if msg_command != int(command_id):
-                logger.debug("Received COMMAND_ACK for other command (got=%s expected=%s)", msg_command, command_id)
-                continue
+            armed = (base_mode & int(MAV_MODE_FLAG_SAFETY_ARMED)) != 0
+            logger.debug("HEARTBEAT base_mode=%s armed=%s", base_mode, armed)
+            return armed
 
-            # Matching command_id
-            if msg_result == MAV_RESULT_ACCEPTED:
-                logger.info("Received COMMAND_ACK accepted for command %s", command_id)
-                return True
+        logger.debug("No HEARTBEAT received to determine armed state; assuming not armed")
+        return False
 
-            logger.warning("Received COMMAND_ACK for command %s but result=%s (not accepted)", command_id, msg_result)
-            return False
+    def _wait_for_ack(self, command_id: int, timeout_s: float | None = None) -> bool:
+        """Wait for a COMMAND_ACK for the given command_id.
 
-        logger.warning("Timeout waiting for COMMAND_ACK for command %s", command_id)
+        Will attempt up to self.ack_retries times, waiting up to timeout_s (or
+        self.ack_timeout_s) each attempt. Between failed attempts a small
+        backoff of 0.1s is applied.
+
+        Returns True if ACK accepted, False otherwise.
+        """
+        if timeout_s is None:
+            timeout_s = float(self.ack_timeout_s)
+
+        MAV_RESULT_ACCEPTED = mavutil.mavlink.MAV_RESULT_ACCEPTED
+
+        for attempt in range(1, max(1, int(self.ack_retries)) + 1):
+            end_time = time.time() + float(timeout_s)
+
+            while time.time() < end_time:
+                try:
+                    msg = self.mav_connection.recv_match(type="COMMAND_ACK", blocking=False)
+                except Exception as exc:
+                    logger.error("Error receiving COMMAND_ACK: %s", exc)
+                    return False
+
+                if msg is None:
+                    time.sleep(0.02)
+                    continue
+
+                # Extract fields defensively
+                try:
+                    msg_command = int(getattr(msg, "command", -1))
+                    msg_result = int(getattr(msg, "result", -1))
+                except Exception:
+                    logger.warning("Malformed COMMAND_ACK message received: %s", msg)
+                    continue
+
+                if msg_command != int(command_id):
+                    logger.debug(
+                        "Received COMMAND_ACK for other command (got=%s expected=%s)",
+                        msg_command,
+                        command_id,
+                    )
+                    continue
+
+                # Matching command_id
+                if msg_result == MAV_RESULT_ACCEPTED:
+                    logger.info("Received COMMAND_ACK accepted for command %s", command_id)
+                    return True
+
+                logger.warning(
+                    "Received COMMAND_ACK for command %s but result=%s (not accepted)",
+                    command_id,
+                    msg_result,
+                )
+                return False
+
+            # attempt timed out without a matching ACK
+            logger.warning(
+                "Timeout waiting for COMMAND_ACK for command %s (attempt %s/%s)",
+                command_id,
+                attempt,
+                self.ack_retries,
+            )
+            # If more attempts remain, backoff a bit before retrying
+            if attempt < self.ack_retries:
+                time.sleep(0.1)
+
+        logger.error("Exhausted %s attempts waiting for COMMAND_ACK for command %s", self.ack_retries, command_id)
         return False
 
     def _send_set_servo(self, pwm: int) -> bool:
@@ -118,8 +191,12 @@ class PayloadController:
         guarantee the autopilot executed the command (ACK must be awaited).
         """
         try:
-            tgt_sys = getattr(self.mav_connection, 'target_system', 0)
-            tgt_comp = getattr(self.mav_connection, 'target_component', 0)
+            # Prefer explicit target ids provided to the controller; fall back to connection's defaults
+            tgt_sys = getattr(self.mav_connection, "target_system", None)
+            tgt_comp = getattr(self.mav_connection, "target_component", None)
+
+            tgt_sys = int(self.target_system) if self.target_system is not None else int(tgt_sys or 0)
+            tgt_comp = int(self.target_component) if self.target_component is not None else int(tgt_comp or 0)
 
             # command_long_send(target_system, target_component, command, confirmation, p1..p7)
             # param1 = servo number, param2 = pwm
@@ -136,8 +213,13 @@ class PayloadController:
                 0.0,
                 0.0,
             )
-            logger.info("Sent MAV_CMD_DO_SET_SERVO: channel=%s pwm=%s (tgt_sys=%s tgt_comp=%s)",
-                        self.servo_channel, pwm, tgt_sys, tgt_comp)
+            logger.info(
+                "Sent MAV_CMD_DO_SET_SERVO: channel=%s pwm=%s (tgt_sys=%s tgt_comp=%s)",
+                self.servo_channel,
+                pwm,
+                tgt_sys,
+                tgt_comp,
+            )
             return True
         except Exception as exc:
             logger.error("Failed to send MAV_CMD_DO_SET_SERVO: %s", exc)
@@ -147,10 +229,15 @@ class PayloadController:
         """Release payload 1 by sending pwm_payload_1 to servo_channel and awaiting ACK.
 
         Returns True if the command was sent and a positive COMMAND_ACK was received.
-        Prevents duplicate releases by checking payload1_released flag.
+        Prevents duplicate releases by checking payload1_released flag. If require_arming
+        is True and vehicle is not armed, the command will not be sent and False is returned.
         """
         if self.payload1_released:
             logger.info("release_payload_1 called but payload1 already released; skipping")
+            return False
+
+        if self.require_arming and not self._check_armed():
+            logger.warning("Vehicle not armed and require_arming=True; not sending payload1 release")
             return False
 
         sent = self._send_set_servo(self.pwm_payload_1)
@@ -171,10 +258,15 @@ class PayloadController:
         """Release payload 2 by sending pwm_payload_2 to servo_channel and awaiting ACK.
 
         Returns True if the command was sent and a positive COMMAND_ACK was received.
-        Prevents duplicate releases by checking payload2_released flag.
+        Prevents duplicate releases by checking payload2_released flag. If require_arming
+        is True and vehicle is not armed, the command will not be sent and False is returned.
         """
         if self.payload2_released:
             logger.info("release_payload_2 called but payload2 already released; skipping")
+            return False
+
+        if self.require_arming and not self._check_armed():
+            logger.warning("Vehicle not armed and require_arming=True; not sending payload2 release")
             return False
 
         sent = self._send_set_servo(self.pwm_payload_2)
