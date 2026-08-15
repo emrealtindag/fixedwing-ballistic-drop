@@ -27,7 +27,8 @@ Returned values
   - Y_lateral_m: meters to the right of the aircraft (positive right)
 
 Notes on signs & edge cases
-- If the ray is (nearly) parallel to the ground (no intersection) a ValueError is raised.
+- If the ray is (nearly) parallel to the ground or points upwards such that the intersection is behind the camera, the function
+  returns (inf, inf) to signal no valid forward ground intersection.
 - This module intentionally keeps conventions explicit. If your system uses a different body/world axis convention (e.g. NED where Z points down), adapt the permutation and sign choices accordingly.
 
 Example
@@ -144,9 +145,11 @@ class GeoProjector:
         Returns
         - (X_forward_m, Y_lateral_m): intersection point in meters in the world frame where the camera
           projection onto the ground is taken as the origin.
+          If the ray does not intersect the ground in front of the camera (ray points upward or is parallel),
+          (inf, inf) is returned to indicate no valid forward ground intersection.
 
         Raises
-        - ValueError if the ray is parallel to the ground (no intersection) or altitude is non-positive.
+        - ValueError if altitude_agl_m is non-positive.
         """
         u, v = pixel_xy
         if altitude_agl_m <= 0.0:
@@ -179,13 +182,14 @@ class GeoProjector:
         # Solve for t where cam_pos_world + t * r_world intersects ground plane z=0
         # t = (z_ground - cam_z) / r_z = (0 - cam_z) / r_z
         r_world_z = float(r_world[2])
-        if np.isclose(r_world_z, 0.0, atol=1e-8):
-            raise ValueError("Ray is parallel to the ground (no intersection)")
+        # If ray is (nearly) parallel to ground or points upward (r_z >= 0), no forward intersection
+        if np.isclose(r_world_z, 0.0, atol=1e-8) or r_world_z >= 0.0:
+            return float("inf"), float("inf")
 
         t = -cam_pos_world[2] / r_world_z
         if t <= 0.0:
             # Intersection is behind the camera (ray points upwards) -> no valid forward intersection
-            raise ValueError("Ray does not intersect the ground in front of the camera")
+            return float("inf"), float("inf")
 
         intersection = cam_pos_world + t * r_world
 
