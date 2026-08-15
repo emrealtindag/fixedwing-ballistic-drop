@@ -1,21 +1,17 @@
-"""Demo pipeline tying perception, ballistics and MAVLink payload controller.
+"""Demo pipeline tying perception, ballistics, Geo projection and MAVLink payload control.
 
 This script reads frames from a camera or video file, runs YOLO target
-detection, estimates the ground distance to detected square targets using a
-simple pinhole camera model (requires approximate focal length in pixels),
-computes ballistic drop offsets and triggers payload release via MAVLink when
-a detected target is within the computed release point.
+detection, projects detections to ground coordinates using a ray-ground
+intersection (GeoProjector), computes ballistic drop offsets and triggers
+payload release via MAVLink when a detected target is within the computed
+release point.
 
-Assumptions and simplifications (for demo purposes):
- - The pinhole distance estimate uses: distance_m = focal_length_px * target_real_height_m / bbox_height_px
- - The UAV airspeed is approximated from VFR_HUD.groundspeed and assumed
-   to be aligned with the camera optical axis (forward = +x).
- - Camera pointing is assumed such that distance along optical axis corresponds
-   to forward range to target (typical for forward-facing cameras).
-
-Usage:
+Usage example:
     python scripts/demo_pipeline.py --video-source 0 --mavlink-conn serial:/dev/ttyUSB0:115200
 
+The script is written for demo/testing. In real operations ensure additional
+safety checks (arming state, flight mode, operator consent) before enabling
+payload release.
 """
 from __future__ import annotations
 
@@ -27,15 +23,17 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
-from scandium.perception.target_detector import YOLOTargetDetector, TargetDetection
-from scandium.control.ballistics import BallisticCalculator
-from scandium.mavlink.payload_controller import PayloadController
+from src.scandium.perception.target_detector import YOLOTargetDetector
+from src.scandium.perception.geo_projection import GeoProjector
+from src.scandium.control.ballistics import BallisticCalculator
+from src.scandium.mavlink.payload_controller import PayloadController
 
 try:
     from pymavlink import mavutil  # type: ignore
     PYMAVLINK_AVAILABLE = True
 except Exception:
     PYMAVLINK_AVAILABLE = False
+
 
 logger = logging.getLogger("demo_pipeline")
 logging.basicConfig(level=logging.INFO)
@@ -77,65 +75,58 @@ def connect_mavlink(conn_str: Optional[str], timeout: float = 5.0):
         return None
 
 
-def get_telemetry(conn) -> Tuple[float, float]:
-    """Retrieve an approximate groundspeed (m/s) and altitude (m).
+def get_telemetry(conn) -> Tuple[float, float, float, float]:
+    """Retrieve approximate groundspeed (m/s), altitude_agl (m), roll (deg), pitch (deg).
 
-    Tries to fetch non-blocking VFR_HUD and GLOBAL_POSITION_INT messages. If
-    not available, returns (groundspeed=20.0, altitude=120.0) as defaults.
+    If connection is None or messages are not available returns CLI defaults.
     """
-    default_speed = 20.0
-    default_alt = 120.0
+    default_speed = 18.0
+    default_alt = 40.0
+    default_roll = 0.0
+    default_pitch = 0.0
 
     if conn is None:
-        return default_speed, default_alt
+        return default_speed, default_alt, default_roll, default_pitch
 
     try:
-        # Non-blocking reads for VFR_HUD and GLOBAL_POSITION_INT
         gs = None
         alt = None
+        roll = None
+        pitch = None
+
         m_vfr = conn.recv_match(type="VFR_HUD", blocking=False)
         if m_vfr is not None and hasattr(m_vfr, "groundspeed"):
             gs = float(m_vfr.groundspeed)
+
         m_pos = conn.recv_match(type="GLOBAL_POSITION_INT", blocking=False)
         if m_pos is not None:
-            # relative_alt is in millimeters
+            # relative_alt is mm in many autopilots
             if hasattr(m_pos, "relative_alt"):
                 alt = float(m_pos.relative_alt) / 1000.0
             elif hasattr(m_pos, "rel_alt"):
                 alt = float(m_pos.rel_alt) / 1000.0
-        # Fallbacks
+
+        m_att = conn.recv_match(type="ATTITUDE", blocking=False)
+        if m_att is not None:
+            # ATTITUDE gives roll,pitch in radians
+            if hasattr(m_att, "roll"):
+                roll = float(m_att.roll) * 180.0 / np.pi
+            if hasattr(m_att, "pitch"):
+                pitch = float(m_att.pitch) * 180.0 / np.pi
+
         if gs is None:
             gs = default_speed
         if alt is None:
             alt = default_alt
-        return gs, alt
+        if roll is None:
+            roll = default_roll
+        if pitch is None:
+            pitch = default_pitch
+
+        return gs, alt, roll, pitch
     except Exception as exc:  # pragma: no cover - env dependent
         logger.exception("Error reading telemetry: %s", exc)
-        return default_speed, default_alt
-
-
-def estimate_target_distance_m(bbox_h_px: int, class_name: str, focal_length_px: float) -> Optional[float]:
-    """Estimate distance to target using simple pinhole formula.
-
-    distance_m = focal_length_px * real_height_m / bbox_height_px
-
-    Returns None if bbox_h_px is zero.
-    """
-    if bbox_h_px <= 0:
-        return None
-    # Real sizes (meters) per class
-    real_height = {"BLUE_SQUARE": 4.0, "RED_SQUARE": 2.0}.get(class_name)
-    if real_height is None:
-        return None
-    return (focal_length_px * real_height) / float(bbox_h_px)
-
-
-def pixel_to_lateral_m(cx: int, img_cx: int, distance_m: float, focal_length_px: float) -> float:
-    """Convert horizontal pixel offset to meters at estimated distance using pinhole model.
-
-    x_m = (cx - img_cx) * distance_m / focal_length_px
-    """
-    return (float(cx) - float(img_cx)) * (distance_m / float(focal_length_px))
+        return default_speed, default_alt, default_roll, default_pitch
 
 
 def draw_hud(frame: np.ndarray, speed: float, altitude: float, predicted_offset: float) -> None:
@@ -155,25 +146,28 @@ def draw_hud(frame: np.ndarray, speed: float, altitude: float, predicted_offset:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Demo pipeline: detection -> ballistics -> payload release")
     parser.add_argument("--video-source", type=str, default="0", help="Video source (camera index or file path). Default 0")
-    parser.add_argument("--model-path", type=str, default="best.pt", help="Path to YOLO model (default: best.pt)")
+    parser.add_argument("--model-path", type=str, default="weights/best.pt", help="Path to YOLO model (default: weights/best.pt)")
     parser.add_argument("--mavlink-conn", type=str, default="", help="MAVLink connection string (e.g. serial:/dev/ttyUSB0:115200)")
     parser.add_argument("--focal-length-px", type=float, default=1000.0, help="Approximate camera focal length in pixels for distance estimation")
     parser.add_argument("--conf-threshold", type=float, default=0.65, help="YOLO confidence threshold")
     parser.add_argument("--use-contour-check", action="store_true", help="Enable contour 4-corner verification in detector")
     parser.add_argument("--release-tolerance-m", type=float, default=3.0, help="Tolerance (m) when comparing predicted offset and estimated target distance")
     parser.add_argument("--lateral-tolerance-m", type=float, default=2.0, help="Allowed lateral error (m) from image center to consider locked target")
+    parser.add_argument("--altitude", type=float, default=40.0, help="Fallback altitude AGL (m) if MAVLink not provided")
+    parser.add_argument("--airspeed", type=float, default=18.0, help="Fallback airspeed (m/s) if MAVLink not provided")
+    parser.add_argument("--mount-pitch", type=float, default=25.0, help="Camera mount pitch (deg)")
     args = parser.parse_args()
 
     # Video source parsing
     try:
         vs_idx = int(args.video_source)
-        video_source = vs_idx
+        video_source: int | str = vs_idx
     except Exception:
         video_source = args.video_source
 
-    # Initialize subsystems
+    # Initialize detector and ballistics
     detector = YOLOTargetDetector(model_path=args.model_path, conf_threshold=args.conf_threshold, use_contour_check=args.use_contour_check)
-    ballistics = BallisticCalculator()  # defaults as specified
+    ballistics = BallisticCalculator()
 
     mav_conn = connect_mavlink(args.mavlink_conn) if args.mavlink_conn else None
     transport = mav_conn if mav_conn is not None else DummyTransport()
@@ -185,6 +179,9 @@ def main() -> None:
         logger.error("Failed to open video source: %s", args.video_source)
         return
 
+    geo_proj: Optional[GeoProjector] = None
+    camera_K: Optional[np.ndarray] = None
+
     logger.info("Starting demo pipeline. Press 'q' to quit.")
 
     try:
@@ -194,43 +191,67 @@ def main() -> None:
                 logger.info("End of video or camera error")
                 break
 
-            # Telemetry
-            groundspeed, altitude = get_telemetry(mav_conn)
-            # UAV airspeed vector approximated as forward-groundspeed along x
-            uav_airspeed = (groundspeed, 0.0, 0.0)
+            h, w = frame.shape[:2]
+            img_cx = w / 2.0
+            img_cy = h / 2.0
 
-            # Ballistic prediction (no wind)
-            forward_offset, lateral_offset, tti = ballistics.predict_drop_offset(uav_airspeed, altitude, wind_xyz=(0.0, 0.0, 0.0), dt=0.01)
+            # Initialize camera intrinsics and GeoProjector on first frame
+            if geo_proj is None:
+                f_px = float(args.focal_length_px)
+                camera_K = np.array([[f_px, 0.0, img_cx], [0.0, f_px, img_cy], [0.0, 0.0, 1.0]], dtype=float)
+                geo_proj = GeoProjector(camera_K, mount_pitch_deg=float(args.mount_pitch), mount_roll_deg=0.0)
+                logger.info("GeoProjector initialized with f=%.1f cx=%.1f cy=%.1f", f_px, img_cx, img_cy)
+
+            # Telemetry
+            groundspeed, altitude_agl, roll_deg, pitch_deg = get_telemetry(mav_conn)
+
+            # Use telemetry fallbacks if no MAVLink
+            if mav_conn is None:
+                groundspeed = float(args.airspeed)
+                altitude_agl = float(args.altitude)
+
+            # Ballistic prediction
+            uav_airspeed = (float(groundspeed), 0.0, 0.0)
+            try:
+                predicted_forward, predicted_lateral, tti = ballistics.predict_drop_offset(uav_airspeed, float(altitude_agl), wind_xyz=(0.0, 0.0, 0.0), dt=0.01)
+            except Exception as exc:
+                logger.exception("Ballistic prediction failed: %s", exc)
+                predicted_forward = float('inf')
+                predicted_lateral = 0.0
 
             # Detect targets
             detections = detector.detect(frame)
-
-            # Draw detections
             vis = detector.draw_detections(frame, detections)
 
-            # Process each detection for distance and potential release
-            h, w = frame.shape[:2]
-            img_cx = w // 2
+            # For each detection compute ground projection and decide release
             for det in detections:
-                # Estimate distance using bounding box height
-                _, _, bw, bh = det.bbox
-                est_dist = estimate_target_distance_m(bh, det.class_name, args.focal_length_px)
-                if est_dist is None:
+                # det.center_px is expected to be (cx, cy)
+                try:
+                    center_px = (int(det.center_px[0]), int(det.center_px[1]))
+                except Exception:
+                    logger.warning("Detection has no valid center_px: %s", det)
                     continue
-                # Lateral offset in meters
-                cx, cy = det.center_px
-                lat_m = pixel_to_lateral_m(cx, img_cx, est_dist, args.focal_length_px)
 
-                # Debug overlay per detection
-                label = f"dist={est_dist:.1f}m lat={lat_m:.1f}m pred={forward_offset:.1f}m"
+                try:
+                    X_target_m, Y_lateral_m = geo_proj.pixel_to_ground(center_px, float(altitude_agl), uav_roll_deg=float(roll_deg), uav_pitch_deg=float(pitch_deg))
+                except Exception as exc:
+                    logger.exception("Geo projection failed for pixel %s: %s", center_px, exc)
+                    continue
+
+                # If projection returned invalid values skip
+                if not np.isfinite(X_target_m) or not np.isfinite(Y_lateral_m):
+                    logger.debug("Ray does not intersect ground in front for pixel %s", center_px)
+                    continue
+
+                # Overlay detection info
+                label = f"{det.class_name} X={X_target_m:.1f}m Y={Y_lateral_m:.1f}m"
                 cv2.putText(vis, label, (det.bbox[0], det.bbox[1] + det.bbox[3] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 0), 1, cv2.LINE_AA)
 
-                # Determine if within release conditions
-                within_forward = abs(forward_offset - est_dist) <= args.release_tolerance_m
-                within_lateral = abs(lat_m) <= args.lateral_tolerance_m
+                # Trigger decision
+                within_forward = abs(X_target_m - float(predicted_forward)) <= float(args.release_tolerance_m)
+                within_lateral = abs(Y_lateral_m) <= float(args.lateral_tolerance_m)
 
                 if within_forward and within_lateral:
-                    # Trigger based on class
                     if det.class_name == "BLUE_SQUARE":
                         ok = payload_ctrl.release_payload_1()
                         if ok:
@@ -240,12 +261,19 @@ def main() -> None:
                         if ok:
                             cv2.putText(vis, "RELEASED PAYLOAD 2", (10, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
 
-            # Draw HUD
-            draw_hud(vis, groundspeed, altitude, forward_offset)
+            # Draw HUD and status
+            draw_hud(vis, float(groundspeed), float(altitude_agl), float(predicted_forward) if np.isfinite(predicted_forward) else 0.0)
 
-            # Show status of payloads
-            status = payload_ctrl.status
-            status_txt = f"P1:{int(status.payload1_released)} P2:{int(status.payload2_released)} Count:{status.total_released_count}"
+            # Show payload status
+            # payload_ctrl may expose flags or a status property; attempt both safely
+            try:
+                p1 = int(getattr(payload_ctrl, "payload1_released", getattr(payload_ctrl, "status", None) and int(getattr(payload_ctrl.status, "payload1_released", 0)) or 0))
+                p2 = int(getattr(payload_ctrl, "payload2_released", getattr(payload_ctrl, "status", None) and int(getattr(payload_ctrl.status, "payload2_released", 0)) or 0))
+                count = int(getattr(payload_ctrl, "status", None) and int(getattr(payload_ctrl.status, "total_released_count", 0)) or 0)
+            except Exception:
+                p1, p2, count = 0, 0, 0
+
+            status_txt = f"P1:{p1} P2:{p2} Count:{count}"
             cv2.putText(vis, status_txt, (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
 
             cv2.imshow("Demo Pipeline", vis)
