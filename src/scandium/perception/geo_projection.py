@@ -1,152 +1,195 @@
-"""scandium.perception.geo_projection
+"""Module to project image pixels to ground plane coordinates using ray-ground intersection.
 
-Geometry utilities to project image pixels to ground plane coordinates using
-ray-ground intersection. The GeoProjector converts a pixel (u,v) into a point
-on the ground (X_forward, Y_lateral) relative to the UAV using the camera
-intrinsics matrix K, camera mounting rotation and the vehicle attitude
-(roll, pitch) plus altitude h.
+Assumptions & coordinate conventions
+- World frame: right-handed, origin at the UAV's camera projection onto the ground (i.e. camera position is at (0, 0, altitude_agl_m)).
+  - X axis: forward (positive ahead of the aircraft)
+  - Y axis: right (positive to the aircraft's right)
+  - Z axis: up (positive upwards from the ground); ground plane is Z = 0
 
-Coordinate conventions used here (simple and consistent):
- - World frame: origin at UAV projection onto ground vertically below UAV.
-   X axis points forward from the UAV, Y axis points right (lateral), Z axis
-   points up. The ground plane is defined as Z = 0, and the UAV is at Z = h (>0).
- - Camera frame: OpenCV convention: x to right, y down, z forward. Rays are
-   expressed in camera coordinates and rotated into the world frame.
+- Camera frame (standard computer-vision convention):
+  - x_c: right
+  - y_c: down
+  - z_c: forward (out of the camera)
 
-The algorithm:
- - Compute normalized image ray r_cam = [ (u - cx)/fx, (v - cy)/fy, 1 ].
- - Rotate r_cam into world using R_world_cam = R_body * R_mount (roll/pitch from
-   autopilot define R_body; R_mount encodes camera mounting offsets).
- - Solve for t where origin_z + t * r_world_z = 0 (ground intersection).
- - Return (X, Y) = origin_xy + t * r_world_xy.
+- To convert a direction vector from camera frame to the world frame the following steps are applied:
+  1. Permute camera axes to align with the body/world basis: camera forward -> body/world +X, camera right -> +Y, camera down -> -Z.
+     This permutation matrix is encoded in _CAM_TO_BODY_PERM.
+  2. Apply camera mount rotation (mount_roll, mount_pitch). These are rotations of the camera with respect to the aircraft body.
+     Both mount angles are given in degrees. Positive mount_pitch_deg means the camera is pitched downwards (i.e. points more towards the ground).
+  3. Apply the UAV attitude rotations (uav_roll_deg, uav_pitch_deg, yaw assumed zero). Positive roll is right-wing-down; positive pitch is nose-up.
 
-Notes:
- - If the ray does not intersect the ground (r_world_z >= 0) None is returned.
- - This implementation ignores yaw because only roll/pitch and mount tilt are
-   provided; include yaw if available for more accurate global placement.
+- Intrinsics: `camera_matrix` is the 3x3 intrinsic matrix K. A pixel (u, v) is converted to a homogeneous ray in camera coordinates r_cam = inv(K) * [u, v, 1]^T.
+
+Returned values
+- (X_forward_m, Y_lateral_m): Coordinates (meters) of the ray-ground intersection point expressed in the world frame where the camera
+  projection onto the ground is taken as the origin.
+  - X_forward_m: meters in front of the aircraft (positive forward)
+  - Y_lateral_m: meters to the right of the aircraft (positive right)
+
+Notes on signs & edge cases
+- If the ray is (nearly) parallel to the ground (no intersection) a ValueError is raised.
+- This module intentionally keeps conventions explicit. If your system uses a different body/world axis convention (e.g. NED where Z points down), adapt the permutation and sign choices accordingly.
+
+Example
+>>> import numpy as np
+>>> K = np.array([[700, 0, 640],[0,700,360],[0,0,1]])
+>>> gp = GeoProjector(K, mount_pitch_deg=25.0, mount_roll_deg=0.0)
+>>> gp.pixel_to_ground((640,360), altitude_agl_m=100.0, uav_roll_deg=0.0, uav_pitch_deg=0.0)
+(0.0, some_value)
+
 """
 from __future__ import annotations
 
-from typing import Tuple, Optional
+from typing import Tuple
+
 import numpy as np
-import math
+
+
+# Permutation matrix that maps camera axes [x_c, y_c, z_c] (right, down, forward)
+# to a body/world basis [x_b, y_b, z_b] (forward, right, up):
+# x_b = z_c
+# y_b = x_c
+# z_b = -y_c
+_CAM_TO_BODY_PERM = np.array([[0.0, 0.0, 1.0],
+                              [1.0, 0.0, 0.0],
+                              [0.0, -1.0, 0.0]])
+
+
+def _deg2rad(deg: float) -> float:
+    return float(deg) * np.pi / 180.0
+
+
+def _rot_x(roll_rad: float) -> np.ndarray:
+    """Rotation matrix about X axis (right-handed).
+
+    Positive angle rotates Y -> Z.
+    """
+    c = np.cos(roll_rad)
+    s = np.sin(roll_rad)
+    return np.array([[1.0, 0.0, 0.0],
+                     [0.0, c, -s],
+                     [0.0, s, c]])
+
+
+def _rot_y(pitch_rad: float) -> np.ndarray:
+    """Rotation matrix about Y axis (right-handed).
+
+    Positive angle rotates Z -> X.
+    """
+    c = np.cos(pitch_rad)
+    s = np.sin(pitch_rad)
+    return np.array([[c, 0.0, s],
+                     [0.0, 1.0, 0.0],
+                     [-s, 0.0, c]])
+
+
+def _rot_z(yaw_rad: float) -> np.ndarray:
+    """Rotation matrix about Z axis (right-handed).
+
+    Positive angle rotates X -> Y.
+    """
+    c = np.cos(yaw_rad)
+    s = np.sin(yaw_rad)
+    return np.array([[c, -s, 0.0],
+                     [s, c, 0.0],
+                     [0.0, 0.0, 1.0]])
 
 
 class GeoProjector:
-    """Project pixels to ground-plane coordinates using ray-ground intersection.
+    """Project image pixels to ground-plane coordinates using ray-ground intersection.
 
     Parameters
-    ----------
-    K: np.ndarray
-        3x3 camera intrinsic matrix (fx, fy, cx, cy).
-    cam_mount_roll_rad: float
-        Camera mounting roll relative to body frame in radians (positive
-        rotates camera clockwise when looking forward).
-    cam_mount_pitch_rad: float
-        Camera mounting pitch (tilt) relative to body frame in radians. A
-        positive value means camera points downwards.
+    - camera_matrix: 3x3 intrinsic matrix K (numpy.ndarray).
+    - mount_pitch_deg: camera mount pitch relative to the aircraft body in degrees.
+        Positive values mean the camera is pitched down toward the ground (common for fixed-wing mapping setups).
+    - mount_roll_deg: camera mount roll relative to the aircraft body in degrees.
+
+    The class does not model camera translation offset w.r.t. the aircraft CG; it assumes the camera center
+    is located directly above the world origin at height altitude_agl_m when calling pixel_to_ground.
+    If your camera has a lateral/forward/backward offset from the aircraft reference point, apply that as
+    a post-translation to the returned (X_forward_m, Y_lateral_m).
     """
 
-    def __init__(
-        self,
-        K: np.ndarray,
-        cam_mount_roll_rad: float = 0.0,
-        cam_mount_pitch_rad: float = 0.0,
-    ) -> None:
-        if K is None or (not isinstance(K, np.ndarray)) or K.shape != (3, 3):
-            raise ValueError("K must be a 3x3 numpy array (camera intrinsic matrix)")
-        self.K = K.astype(float)
-        self.fx = float(self.K[0, 0])
-        self.fy = float(self.K[1, 1])
-        self.cx = float(self.K[0, 2])
-        self.cy = float(self.K[1, 2])
-        self.cam_mount_roll = float(cam_mount_roll_rad)
-        self.cam_mount_pitch = float(cam_mount_pitch_rad)
+    def __init__(self, camera_matrix: np.ndarray, mount_pitch_deg: float = 25.0, mount_roll_deg: float = 0.0):
+        if camera_matrix.shape != (3, 3):
+            raise ValueError("camera_matrix must be a 3x3 numpy array")
+        self.K = camera_matrix.astype(float)
+        self.K_inv = np.linalg.inv(self.K)
+        self.mount_pitch_deg = float(mount_pitch_deg)
+        self.mount_roll_deg = float(mount_roll_deg)
 
-    @staticmethod
-    def _Rx(phi: float) -> np.ndarray:
-        c = math.cos(phi)
-        s = math.sin(phi)
-        return np.array([[1, 0, 0], [0, c, -s], [0, s, c]], dtype=float)
+        # Precompute mount rotation: rotation from camera frame (after permutation) into body frame
+        # Apply mount roll (about camera's X->body Y) then mount pitch (about camera's Y->body Y after perm)
+        # For clarity we build R_mount such that: v_body = R_mount @ (P @ v_cam)
+        mount_roll_rad = _deg2rad(self.mount_roll_deg)
+        mount_pitch_rad = _deg2rad(self.mount_pitch_deg)
 
-    @staticmethod
-    def _Ry(theta: float) -> np.ndarray:
-        c = math.cos(theta)
-        s = math.sin(theta)
-        return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]], dtype=float)
+        # Note: after permutation, applying roll (about forward axis) and pitch (about right axis)
+        # corresponds to rotations about body axes. Build R_mount in body axes order: R_body = R_y(pitch) @ R_x(roll)
+        R_mount_x = _rot_x(mount_roll_rad)
+        R_mount_y = _rot_y(mount_pitch_rad)
+        # R_mount_body_cam maps a vector in camera coords (after permutation) into body coords
+        self.R_mount_body_cam = R_mount_y @ R_mount_x @ _CAM_TO_BODY_PERM
 
-    @staticmethod
-    def _Rz(psi: float) -> np.ndarray:
-        c = math.cos(psi)
-        s = math.sin(psi)
-        return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=float)
-
-    def project_pixel_to_ground(
-        self,
-        u: float,
-        v: float,
-        uav_roll_rad: float,
-        uav_pitch_rad: float,
-        h_m: float,
-    ) -> Optional[Tuple[float, float]]:
-        """Project a pixel (u,v) to ground coordinates (X_forward, Y_lateral).
+    def pixel_to_ground(self, pixel_xy: Tuple[int, int], altitude_agl_m: float,
+                        uav_roll_deg: float = 0.0, uav_pitch_deg: float = 0.0) -> Tuple[float, float]:
+        """Compute the ground intersection (X_forward_m, Y_lateral_m) for a pixel.
 
         Parameters
-        ----------
-        u, v: float
-            Pixel coordinates in image (u: x, v: y).
-        uav_roll_rad: float
-            UAV roll (radians) from autopilot. Positive = right wing down.
-        uav_pitch_rad: float
-            UAV pitch (radians) from autopilot. Positive = nose up.
-        h_m: float
-            UAV altitude above ground in meters (must be > 0).
+        - pixel_xy: (u, v) pixel coordinates in image (integers are accepted).
+        - altitude_agl_m: altitude above ground level in meters (positive).
+        - uav_roll_deg: aircraft roll angle in degrees. Positive roll = right wing down.
+        - uav_pitch_deg: aircraft pitch angle in degrees. Positive pitch = nose up.
 
         Returns
-        -------
-        (X_forward, Y_lateral) in meters relative to UAV projection on ground,
-        or None if ray does not intersect the ground plane.
+        - (X_forward_m, Y_lateral_m): intersection point in meters in the world frame where the camera
+          projection onto the ground is taken as the origin.
+
+        Raises
+        - ValueError if the ray is parallel to the ground (no intersection) or altitude is non-positive.
         """
-        # Validate altitude
-        h = float(h_m)
-        if h <= 0.0:
-            return None
+        u, v = pixel_xy
+        if altitude_agl_m <= 0.0:
+            raise ValueError("altitude_agl_m must be positive")
 
-        # Normalized image coordinates (camera frame)
-        x_n = (float(u) - self.cx) / self.fx
-        y_n = (float(v) - self.cy) / self.fy
-        # Ray in camera frame (z forward)
-        r_cam = np.array([x_n, y_n, 1.0], dtype=float)
+        # Build the unit ray in camera coordinates (direction from camera center through pixel)
+        pixel_h = np.array([float(u), float(v), 1.0])
+        r_cam = self.K_inv @ pixel_h
+        # We only care about direction, normalize for numerical stability
+        r_cam = r_cam / np.linalg.norm(r_cam)
 
-        # Camera mounting rotation: first roll then pitch (mount angles are small)
-        R_mount = self._Rx(self.cam_mount_roll) @ self._Ry(self.cam_mount_pitch)
+        # Map camera ray into body frame, then into world frame using UAV attitude
+        # First: body <- camera
+        r_body = self.R_mount_body_cam @ r_cam
 
-        # Vehicle/body rotation from autopilot: roll about X, pitch about Y
-        R_body = self._Rx(uav_roll_rad) @ self._Ry(uav_pitch_rad)
+        # Build UAV attitude rotation (body -> world). We assume yaw = 0 (unknown) and only use roll/pitch.
+        roll_rad = _deg2rad(float(uav_roll_deg))
+        pitch_rad = _deg2rad(float(uav_pitch_deg))
+        yaw_rad = 0.0
 
-        # Full rotation from camera frame to world frame (world frame: X forward, Y right, Z up)
-        # r_world = R_body @ R_mount @ r_cam
-        r_world = R_body.dot(R_mount.dot(r_cam))
+        # R_world_body = R_z(yaw) @ R_y(pitch) @ R_x(roll)
+        R_world_body = _rot_z(yaw_rad) @ _rot_y(pitch_rad) @ _rot_x(roll_rad)
 
-        # In our world frame the origin is at UAV at height h above ground (Z = h).
-        # Ray param: p(t) = origin + t * r_world, we need Z component p_z = 0
-        # => h + t * r_world_z = 0 => t = -h / r_world_z
-        # Only valid if r_world_z < 0 (ray points downwards)
-        rz = float(r_world[2])
-        if rz >= 0.0:
-            # Ray does not intersect ground (points upwards or parallel)
-            return None
+        # r_world is the direction vector in world frame
+        r_world = R_world_body @ r_body
 
-        t = -h / rz
-        p = t * r_world
-        X = float(p[0])
-        Y = float(p[1])
-        return X, Y
+        # Camera position in world coordinates: (0, 0, altitude)
+        cam_pos_world = np.array([0.0, 0.0, float(altitude_agl_m)])
 
+        # Solve for t where cam_pos_world + t * r_world intersects ground plane z=0
+        # t = (z_ground - cam_z) / r_z = (0 - cam_z) / r_z
+        r_world_z = float(r_world[2])
+        if np.isclose(r_world_z, 0.0, atol=1e-8):
+            raise ValueError("Ray is parallel to the ground (no intersection)")
 
-# Utility constructor from fx/fy/cx/cy convenience
-def make_projector_from_focal(
-    fx: float, fy: float, cx: float, cy: float, cam_mount_roll_rad: float = 0.0, cam_mount_pitch_rad: float = 0.0
-) -> GeoProjector:
-    K = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=float)
-    return GeoProjector(K, cam_mount_roll_rad=cam_mount_roll_rad, cam_mount_pitch_rad=cam_mount_pitch_rad)
+        t = -cam_pos_world[2] / r_world_z
+        if t <= 0.0:
+            # Intersection is behind the camera (ray points upwards) -> no valid forward intersection
+            raise ValueError("Ray does not intersect the ground in front of the camera")
+
+        intersection = cam_pos_world + t * r_world
+
+        X_forward_m = float(intersection[0])
+        Y_lateral_m = float(intersection[1])
+
+        return X_forward_m, Y_lateral_m
