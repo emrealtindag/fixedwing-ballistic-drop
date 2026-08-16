@@ -182,6 +182,9 @@ def main() -> None:
     mav_cfg = cfg.get("mavlink", {})
 
     combined_tol_m = float(mis_cfg.get("release_tolerance_m", 3.0))
+    system_latency_s = float(mis_cfg.get("system_latency_s", 0.180))
+    max_roll_gate_deg = float(mis_cfg.get("max_roll_gate_deg", 15.0))
+    max_pitch_gate_deg = float(mis_cfg.get("max_pitch_gate_deg", 10.0))
 
     detector = YOLOTargetDetector(
         model_path=mis_cfg.get("model_path", "weights/best.pt"),
@@ -289,6 +292,12 @@ def main() -> None:
                     dt=float(bal_cfg.get("dt", 0.01)),
                 )
 
+                # Sistem gecikmesi (180ms) avansı: Uçağın yer hızına göre çarpma noktasını ötele
+                lead_x = telemetry.ground_vx.value * system_latency_s
+                lead_y = telemetry.ground_vy.value * system_latency_s
+                effective_impact_x = impact_x + lead_x
+                effective_impact_y = impact_y + lead_y
+
                 # 5. Algılama ve Zemin Projeksiyonu
                 detections: List[TargetDetection] = detector.detect(frame)
                 candidate_targets: List[Tuple[float, TargetDetection]] = []
@@ -305,17 +314,22 @@ def main() -> None:
                     if not np.isfinite(xt) or not np.isfinite(yt):
                         continue
 
-                    dist_err = math.hypot(xt - impact_x, yt - impact_y)
+                    dist_err = math.hypot(xt - effective_impact_x, yt - effective_impact_y)
                     candidate_targets.append((dist_err, det))
 
-                # 6. Önceliklendirme ve Bırakma Kararı
+                # 6. Önceliklendirme, Tutum Kontrolü ve Bırakma Kararı
                 min_err_frame: Optional[float] = None
+                is_attitude_safe = (
+                    abs(telemetry.roll_deg.value) <= max_roll_gate_deg
+                    and abs(telemetry.pitch_deg.value) <= max_pitch_gate_deg
+                )
+
                 if candidate_targets:
                     candidate_targets.sort(key=lambda item: item[0])
                     min_err_frame = candidate_targets[0][0]
 
                     for dist_err, det in candidate_targets:
-                        if dist_err <= combined_tol_m and payload_ctrl:
+                        if dist_err <= combined_tol_m and is_attitude_safe and payload_ctrl:
                             auth = telemetry.is_authorized(require_arm, force=args.force_release)
                             if det.class_name == "BLUE_SQUARE" and not payload_ctrl.is_released(1):
                                 logger.info("🎯 MAVİ HEDEF MENZİLDE (Hata: %.2fm). Tetikleniyor...", dist_err)
