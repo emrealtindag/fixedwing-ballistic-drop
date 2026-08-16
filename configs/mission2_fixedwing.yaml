@@ -1,0 +1,45 @@
+# Mission configuration for fixed-wing ballistic drop demo
+# Organized and annotated for readability and easy tuning.
+camera:
+  # Camera mounting angles (degrees). Positive pitch looks downwards.
+  mount_pitch_deg: 25.0
+  mount_roll_deg: 0.0
+  # Focal length in pixels (used by projection routines)
+  focal_length_px: 1000.0
+  # Image dimensions (pixels)
+  width: 640
+  height: 480
+
+ballistics:
+  # Physical parameters for drop simulation
+  payload_mass_kg: 0.35
+  drag_coeff_cd: 0.45
+  cross_area_m2: 0.008
+  air_density_rho: 1.225
+  dt: 0.01
+  max_simulation_time_s: 60.0  # 60 saniye zaman aşımı limiti
+
+payload:
+  # Servo settings for payload release controller
+  servo_channel: 9
+  pwm_payload_1: 1500
+  pwm_payload_2: 2000
+  require_arming: true
+  ack_retries: 2
+  ack_timeout_s: 1.0
+  target_system: 1
+  target_component: 1
+
+mission:
+  # Acceptance tolerances and model config
+  release_tolerance_m: 3.0
+  lateral_tolerance_m: 2.0
+  conf_threshold: 0.65
+  use_contour_check: false
+  model_path: "weights/best.pt"
+
+mavlink:
+  # MAVLink connection and fallback flight parameters
+  connection_string: "udp:127.0.0.1:14551"
+  fallback_altitude_m: 40.0
+  fallback_airspeed_mps: 18.0
