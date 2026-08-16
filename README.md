@@ -8,431 +8,222 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 
-## Overview !
+## Overview
 
-**Scandium** is a production-grade precision landing system designed for Unmanned Aerial Vehicle (UAV) and multirotor platforms. The system operates as companion computer software that enables autonomous precision landing on fiducial markers (ArUco/AprilTag) by publishing MAVLink `LANDING_TARGET` messages to compatible autopilot systems including PX4 and ArduPilot.
+**Scandium** is an autonomous airborne target acquisition, ballistic trajectory estimation, and payload delivery system designed for fixed-wing and multirotor Unmanned Aerial Vehicles (UAVs). The system operates on onboard companion computers to perform real-time target recognition, 3D world-coordinate projection, numerical ballistic impact prediction, and automated actuator deployment via MAVLink.
 
-This software package addresses the critical requirement for high-accuracy landing capabilities in scenarios where GNSS-based positioning proves insufficient, including indoor environments, GNSS-denied regions, and applications demanding sub-meter landing precision.
+Developed for search-and-rescue (SAR), humanitarian aid distribution, and precision aerial delivery missions, Scandium dynamically computes release points by combining live telemetry, camera attitude, aerodynamic drag profiles, and vehicle ground speeds.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Key Capabilities](#key-capabilities)
+- [System Architecture](#system-architecture)
 - [System Requirements](#system-requirements)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [System Architecture](#system-architecture)
 - [Configuration](#configuration)
-- [Documentation](#documentation)
-- [Development](#development)
-- [Testing](#testing)
+- [MAVLink & Actuator Interface](#mavlink--actuator-interface)
 - [Safety and Compliance](#safety-and-compliance)
 - [License](#license)
-- [Contributing](#contributing)
 
 ## Key Capabilities
 
-### Fiducial Marker Detection
-Multi-backend fiducial marker detection system supporting both ArUco (OpenCV) and AprilTag marker families. The detection pipeline incorporates configurable dictionary selection, marker size specification, and target ID allowlisting for operational security.
+### Real-Time Target Detection & Tracking
+Deep-learning-based visual pipeline utilizing YOLOv8 and geometric contour filtering. Supports multi-class ground target recognition, false-positive filtering, and continuous bounding-box tracking across variable lighting conditions and flight altitudes.
 
-### Pose Estimation
-Camera-to-body frame coordinate transformation system utilizing Perspective-n-Point (PnP) algorithms with temporal filtering. The estimation pipeline produces both position-based (x, y, z) and angle-based (angle_x, angle_y) outputs compatible with MAVLink LANDING_TARGET protocol specifications.
+### Pixel-to-World Geo-Projection
+Rigorous geometric transform engine mapping image-plane pixel coordinates $(u, v)$ to metric ground coordinates $(X, Y, Z)$. The solver compensates for:
+- Camera intrinsic parameters (focal length, principal point, distortion)
+- Fixed camera mount angles (Pitch/Roll/Yaw offsets)
+- Real-time UAV attitude (Roll, Pitch, Yaw from vehicle AHRS/IMU)
+- Relative flight altitude above ground level (AGL)
 
-### MAVLink Integration
-Native MAVLink protocol implementation for LANDING_TARGET message publishing. The system supports both UDP and serial transport layers, configurable publishing rates (10-50 Hz), and compatibility with PX4 and ArduPilot precision landing subsystems.
+### Heun Ballistic Trajectory Engine
+Numerical integration solver using Heun's method (Runge-Kutta 2nd order) for forward release point prediction:
+- Evaluates non-linear aerodynamic drag:
+  $$\mathbf{F}_d = -\frac{1}{2} \rho C_d A \|\mathbf{v}\| \mathbf{v}$$
+- Ingests instantaneous airspeed, ground speed vectors, and drop altitude
+- Calculates required forward release distance offset and cross-track release window in real time
 
-### Landability Analysis
-Computer vision-based landing zone safety assessment system. The analysis incorporates texture variance evaluation, motion detection, edge density analysis, and optional machine learning-based segmentation for obstacle and human presence detection.
+### Actuator Control & MAVLink Safety
+Native PyMAVLink control pipeline executing servo triggering (`MAV_CMD_DO_SET_SERVO`):
+- Non-blocking `COMMAND_ACK` verification with retry loops
+- Arming and flight mode safety interlocks
+- Idempotent payload release states preventing accidental duplicate triggers
 
-### Finite State Machine Control
-Deterministic state machine implementation managing the complete landing sequence: INIT, IDLE, SEARCH, ACQUIRE, ALIGN, DESCEND, TOUCHDOWN, ABORT, and FAILSAFE states. State transitions are governed by configurable thresholds and safety constraints.
+## System Architecture
 
 ```mermaid
-stateDiagram-v2
-    [*] --> INIT
-    INIT --> IDLE: System Ready
-    IDLE --> SEARCH: Arm Command
-    IDLE --> ACQUIRE: Target Visible
-    SEARCH --> ACQUIRE: Target Detected
-    ACQUIRE --> ALIGN: Filter Stabilized
-    ACQUIRE --> SEARCH: Target Lost
-    ALIGN --> DESCEND: Lateral Error < Threshold
-    ALIGN --> SEARCH: Target Lost
-    DESCEND --> TOUCHDOWN: Altitude < Threshold
-    DESCEND --> SEARCH: Target Lost
-    TOUCHDOWN --> [*]
-    
-    ACQUIRE --> ABORT: Low Landability
-    ALIGN --> ABORT: Low Landability
-    DESCEND --> ABORT: Low Landability
-    DESCEND --> ABORT: Human Detected
-    
-    INIT --> FAILSAFE: Link Lost
-    SEARCH --> FAILSAFE: Link Lost
-    ACQUIRE --> FAILSAFE: Link Lost
-    ALIGN --> FAILSAFE: Link Lost
-    DESCEND --> FAILSAFE: Link Lost
-```
+flowchart TB
+    subgraph SENSORS["Sensing & Ingest"]
+        CAM["Camera Stream\n(UVC / MIPI / Video)"]
+        TELEM["MAVLink Telemetry\n(Attitude, Speed, Altitude)"]
+    end
 
-### Simulation Integration
-Comprehensive simulation environment support including Microsoft AirSim and Software-In-The-Loop (SITL) configurations for both ArduPilot and PX4. Scenario-based testing framework enables systematic validation across diverse environmental conditions.
+    subgraph PERCEPTION["Perception & Spatial Pipeline"]
+        DET["Target Detector\n(YOLOv8 Inference)"]
+        PROJ["Geo-Projector\n(Pixel-to-Ground Solver)"]
+        CAM --> DET
+        DET --> PROJ
+        TELEM --> PROJ
+    end
+
+    subgraph BALLISTICS["Trajectory & Guidance Engine"]
+        HEUN["Heun Numerical Integrator\n(Aerodynamic Drag & Gravity)"]
+        DROP_LOGIC["Release Window Validator\n(Distance & Cross-Track Tolerance)"]
+        TELEM --> HEUN
+        PROJ --> DROP_LOGIC
+        HEUN --> DROP_LOGIC
+    end
+
+    subgraph ACTUATION["Actuation & Autopilot"]
+        CTRL["Payload Controller\n(MAVLink Command Interface)"]
+        AP["Autopilot / Pixhawk\n(ArduPlane / PX4)"]
+        SERVO["Payload Mechanism\n(Servo Release 1 & 2)"]
+
+        DROP_LOGIC --> CTRL
+        CTRL --> AP
+        AP --> SERVO
+    end
+
+    style SENSORS fill:#1e293b,stroke:#475569,color:#fff
+    style PERCEPTION fill:#0f172a,stroke:#334155,color:#fff
+    style BALLISTICS fill:#1e1b4b,stroke:#4338ca,color:#fff
+    style ACTUATION fill:#14532d,stroke:#16a34a,color:#fff
+```
 
 ## System Requirements
 
 ### Software Dependencies
 
 | Component | Minimum Version | Recommended Version |
-|-----------|-----------------|---------------------|
+| :--- | :--- | :--- |
 | Python | 3.11 | 3.12 |
 | OpenCV | 4.9.0 | 4.10.0 |
 | NumPy | 1.26.0 | 1.26.4 |
-| pymavlink | 2.4.41 | Latest |
-| Poetry | 1.7.0 | 1.8.0 |
+| Ultralytics (YOLO) | 8.1.0 | Latest |
+| PyMAVLink | 2.4.41 | Latest |
+| Poetry | 1.7.0 | 1.8.0+ |
 
-### Operating System Compatibility
+### Hardware Platforms
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Ubuntu 22.04 LTS (x86_64) | Primary | Recommended development platform |
-| Ubuntu 24.04 LTS (x86_64) | Supported | Full compatibility |
-| Debian 12 (x86_64) | Supported | Tested |
-| NVIDIA Jetson (ARM64) | Experimental | Additional configuration required |
-| Windows 11 (WSL2) | Development Only | SITL testing supported |
+| Hardware | Support Level | Notes |
+| :--- | :--- | :--- |
+| NVIDIA Jetson (Orin / Xavier) | Primary Target | CUDA-accelerated TensorRT inference |
+| Raspberry Pi 4 / 5 (8GB) | Supported | CPU / NCNN inference mode |
+| x86_64 Ground Station | Development & SITL | Full development and simulation platform |
 
 ## Installation
 
-### Prerequisites
-
-Ensure Poetry package manager is installed on the target system:
-
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
-### Standard Installation
-
 ```bash
 # Clone the repository
-git clone https://github.com/emrealtindag/scandium.git
+git clone [https://github.com/emrealtindag/scandium.git](https://github.com/emrealtindag/scandium.git)
 cd scandium
 
 # Install dependencies via Poetry
-poetry install
+poetry install --with dev
 
-# Verify installation
-poetry run scandium version
-```
-
-### Development Installation
-
-```bash
-# Install with development dependencies
-poetry install --with dev,docs
-
-# Install pre-commit hooks
-poetry run pre-commit install
-```
-
-### Docker Installation
-
-```bash
-# Build Docker image
-docker build -f docker/Dockerfile -t scandium:latest .
-
-# Run container
-docker run -it --rm scandium:latest scandium version
+# Verify environment
+poetry run python -c "import scandium; print('Scandium loaded successfully')"
 ```
 
 ## Quick Start
 
-### Basic Execution
+### 1. Execute Integrated Pipeline (Live Video or Synthetic Playback)
 
 ```bash
-# Execute with default configuration
-poetry run scandium run --config configs/default.yaml
+# Run pipeline with a configuration file
+poetry run python scripts/demo_pipeline.py --config configs/mission_fixedwing.yaml
 
-# Execute AirSim simulation demonstration
-poetry run scandium sim airsim --config configs/airsim_demo.yaml
-
-# Execute system diagnostics
-poetry run scandium diagnostics --config configs/default.yaml
+# Run directly specifying video source and model weights
+poetry run python scripts/demo_pipeline.py \
+  --video-source 0 \
+  --model-path models/best.pt \
+  --focal-length-px 1050 \
+  --mavlink-conn udp:127.0.0.1:14550
 ```
 
-### ArduPilot SITL Integration
+### 2. Run in Hardware-in-the-Loop (HITL / Serial) Mode
 
 ```bash
-# Initialize ArduPilot SITL environment
-./scripts/run_sitl_ardupilot.sh
-
-# Execute Scandium with ArduPilot configuration
-poetry run scandium run --config configs/ardupilot_sitl.yaml
+poetry run python scripts/demo_pipeline.py \
+  --video-source /dev/video0 \
+  --model-path models/best.pt \
+  --mavlink-conn serial:/dev/ttyTHS1:115200
 ```
-
-### PX4 SITL Integration
-
-```bash
-# Initialize PX4 SITL environment
-./scripts/run_sitl_px4.sh
-
-# Execute Scandium with PX4 configuration
-poetry run scandium run --config configs/px4_sitl.yaml
-```
-
-## System Architecture
-
-The Scandium system architecture comprises four primary layers: Perception, Control, MAVLink I/O, and Simulation/Tooling.
-
-```mermaid
-flowchart TB
-    subgraph SCANDIUM["SCANDIUM SYSTEM"]
-        subgraph Perception["Perception Layer"]
-            VI["Video Ingest\n(Camera Source)"] --> FD["Fiducial Detector\n(ArUco/AprilTag)"]
-            FD --> PE["Pose Estimator\n(solvePnP/EKF)"]
-            PE --> FT["Frame Transforms"]
-        end
-        
-        subgraph Control["Control Layer"]
-            LE["Landability Estimator\n(Heuristic/ML)"] --> FSM["Landing FSM"]
-            FT --> FSM
-        end
-        
-        subgraph MAVLink["MAVLink I/O"]
-            FSM --> LT["LANDING_TARGET\nPublisher"]
-        end
-    end
-    
-    LT --> AP["Autopilot\n(PX4/ArduPilot)"]
-    
-    style SCANDIUM fill:#1a1a2e,stroke:#16213e,color:#fff
-    style Perception fill:#0f3460,stroke:#16213e,color:#fff
-    style Control fill:#533483,stroke:#16213e,color:#fff
-    style MAVLink fill:#e94560,stroke:#16213e,color:#fff
-    style AP fill:#0f3460,stroke:#16213e,color:#fff
-```
-
-### Layer Descriptions
-
-| Layer | Responsibility | Key Components |
-|-------|----------------|----------------|
-| Perception | Visual processing and target localization | VideoIngest, FiducialDetector, PoseEstimator, TargetFilter, LandabilityEstimator |
-| Control | Decision logic and state management | LandingFSM, Guidance, SafetySupervisor |
-| MAVLink I/O | Autopilot communication | MavlinkTransport, LandingTargetPublisher, HeartbeatMonitor |
-| Simulation | Development and testing infrastructure | AirSimBridge, SITLOrchestrator, ScenarioRunner |
 
 ## Configuration
 
-Configuration management utilizes YAML files with Pydantic schema validation. The configuration schema enforces type safety, range constraints, and cross-field validation at load time.
-
-### Configuration File Structure
+System settings are managed via YAML files and validated using runtime schemas:
 
 ```yaml
-# configs/default.yaml
+# configs/mission_fixedwing.yaml
 project:
-  name: "Scandium"
-  run_id: "auto"
-  mode: "sitl"
+  name: "Scandium-Delivery"
   log_level: "INFO"
-  output_dir: "./runs"
 
 camera:
-  source: "airsim"
-  device_index: 0
+  source: 0
   width: 1280
   height: 720
   fps: 30
-  intrinsics_path: "configs/camera/calib_example.yaml"
-  extrinsics_path: "configs/camera/extrinsics_example.yaml"
-  undistort: true
+  focal_length_px: 1050.0
+  mount:
+    pitch_deg: 25.0   # Fixed down-pitch angle
+    roll_deg: 0.0
+    yaw_deg: 0.0
 
-fiducials:
-  backend: "aruco"
-  marker_size_m: 0.20
-  target_id_allowlist: [1]
-  aruco:
-    dictionary: "DICT_4X4_100"
-    refine: true
+detection:
+  model_path: "models/best.pt"
+  confidence_threshold: 0.65
+  use_contour_check: false
 
-pose:
-  frame: "MAV_FRAME_BODY_NED"
-  filter:
-    type: "exp_smooth"
-    alpha: 0.35
-    outlier_mahalanobis: 4.0
+ballistics:
+  payload_mass_kg: 0.350
+  drag_coefficient: 0.45
+  cross_sectional_area_m2: 0.008
+  integration_step_s: 0.01
+
+drop_constraints:
+  release_tolerance_m: 3.0
+  lateral_tolerance_m: 2.0
+  min_release_altitude_m: 20.0
+  max_release_altitude_m: 60.0
 
 mavlink:
-  transport: "udp"
-  udp:
-    address: "127.0.0.1"
-    port: 14550
-  system_id: 42
-  component_id: 200
-  landing_target_rate_hz: 20
-
-control:
-  enable_fsm: true
-  fsm_rate_hz: 20
-  thresholds:
-    acquire_confidence: 0.70
-    align_error_m: 0.25
-    abort_landability: 0.40
-
-landability:
-  enabled: true
-  method: "heuristic"
-  heuristic:
-    texture_var_min: 12.0
-    motion_threshold: 0.15
+  connection: "udp:127.0.0.1:14551"
+  target_system: 1
+  target_component: 1
+  require_arming: true
+  servo_channel: 9
+  pwm_payload_1: 1500
+  pwm_payload_2: 2000
 ```
 
-### Configuration Reference
+## MAVLink & Actuator Interface
 
-Comprehensive configuration documentation is available at [docs/configuration.md](docs/configuration.md).
-
-## Documentation
-
-Complete documentation is available at [scandium-oss.github.io/scandium](https://scandium-oss.github.io/scandium).
-
-| Document | Description |
-|----------|-------------|
-| [Architecture Guide](docs/architecture.md) | System architecture and design rationale |
-| [MAVLink Integration](docs/mavlink.md) | LANDING_TARGET protocol implementation |
-| [PX4 Integration](docs/px4.md) | PX4 autopilot configuration and parameters |
-| [ArduPilot Integration](docs/ardupilot.md) | ArduPilot configuration and parameters |
-| [Simulation Setup](docs/simulation.md) | SITL and AirSim environment configuration |
-| [Landability Analysis](docs/landability.md) | Landing zone safety assessment algorithms |
-| [Testing Guide](docs/testing.md) | Test strategy and execution procedures |
-| [Deployment Guide](docs/deployment.md) | Production deployment considerations |
-
-## Development
-
-### Development Environment Setup
-
-```bash
-# Install all dependency groups
-poetry install --with dev,docs,sim
-
-# Configure pre-commit hooks
-poetry run pre-commit install
-
-# Verify development environment
-make check
-```
-
-### Code Quality Standards
-
-The project enforces the following code quality standards:
-
-| Tool | Purpose | Configuration |
-|------|---------|---------------|
-| Black | Code formatting | `pyproject.toml` |
-| Ruff | Linting | `ruff.toml` |
-| mypy | Static type checking | `mypy.ini` |
-| pytest | Unit and integration testing | `pytest.ini` |
-
-### Development Commands
-
-```bash
-# Execute linting
-poetry run ruff check .
-poetry run black --check .
-
-# Execute type checking
-poetry run mypy src/
-
-# Execute all quality checks
-make lint
-```
-
-## Testing
-
-### Test Execution
-
-```bash
-# Execute unit tests
-poetry run pytest tests/unit/ -v
-
-# Execute integration tests
-poetry run pytest tests/integration/ -v
-
-# Execute with coverage reporting
-poetry run pytest --cov=src/scandium --cov-report=html
-```
-
-### Test Categories
-
-| Category | Scope | Location |
-|----------|-------|----------|
-| Unit Tests | Individual component validation | `tests/unit/` |
-| Integration Tests | Cross-component interaction | `tests/integration/` |
-| Scenario Tests | End-to-end simulation validation | `configs/scenarios/` |
-
-### Continuous Integration
-
-The project utilizes GitHub Actions for continuous integration. All pull requests must pass the following checks:
-
-- Linting (ruff, black)
-- Type checking (mypy)
-- Unit tests (pytest)
-- Security scanning (pip-audit)
-- Docker build verification
+Scandium issues standard MAVLink command packets (`MAV_CMD_DO_SET_SERVO`) to actuate drop doors:
+- **Payload 1 Release:** Triggers Servo Channel 9 (`PWM = 1500`)
+- **Payload 2 Release:** Triggers Servo Channel 9 (`PWM = 2000`)
+- **Telemetry Ingest:** Continuously tracks `ATTITUDE` (Roll, Pitch, Yaw), `GLOBAL_POSITION_INT` (Relative Alt), and `VFR_HUD` (Ground Speed / Airspeed).
 
 ## Safety and Compliance
 
-> **IMPORTANT SAFETY NOTICE**
->
-> This software is designed exclusively for flight safety, safe recovery, automatic landing, and operational reliability applications. The system is intended for civilian and commercial UAV operations including but not limited to: infrastructure inspection, agricultural monitoring, search and rescue support, and logistics delivery.
->
-> This software does not contain, and must not be modified to include, functionality for weaponization, target engagement, munitions guidance, or any harmful purposes. Any such modification would constitute a violation of the intended use and the terms of the Apache 2.0 license under which this software is distributed.
-
-### Operational Safety Features
-
-- **Fail-safe by default**: Uncertainty escalation triggers conservative behavior
-- **No single point of failure**: Camera or MAVLink loss triggers autopilot fallback
-- **Human safety priority**: Landability analysis aborts landing upon human detection
-- **Anti-spoofing measures**: Tag allowlisting, size consistency validation, reprojection error thresholds
+> **CIVILIAN & ETHICAL USE ONLY**  
+> This software is engineered exclusively for search-and-rescue operations, humanitarian disaster relief distribution, scientific research, and commercial civilian aerial delivery.  
+> Modification, integration, or deployment of this software for kinetic impact mechanisms, munitions deployment, offensive target engagement, or any destructive application is strictly prohibited under the project's license terms.
 
 ## License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for the complete license text.
+Distributed under the Apache License 2.0. See [LICENSE](LICENSE) for full details.
 
-```
-Copyright 2024-2025 Scandium Development Team
+```text
+Copyright 2024-2026 Scandium Engineering Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+    [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
 ```
-
-## Contributing
-
-Contributions are welcome. Please review [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, coding standards, and the pull request process.
-
-### Contribution Process
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/enhancement-name`)
-3. Implement changes with appropriate tests
-4. Ensure all quality checks pass (`make check`)
-5. Submit a pull request with detailed description
-
-## Acknowledgments
-
-This project utilizes the following open-source components:
-
-- [OpenCV](https://opencv.org/) - Computer vision library
-- [pymavlink](https://github.com/ArduPilot/pymavlink) - MAVLink protocol implementation
-- [Pydantic](https://pydantic.dev/) - Data validation framework
-- [Typer](https://typer.tiangolo.com/) - CLI framework
-- [structlog](https://www.structlog.org/) - Structured logging
-
----
-
-**Scandium** - Precision Landing System for Autonomous Aerial Platforms
