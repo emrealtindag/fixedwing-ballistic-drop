@@ -37,6 +37,10 @@ mission:
   conf_threshold: 0.65
   use_contour_check: false
   model_path: "weights/best.pt"
+  system_latency_s: 0.180      # Toplam sistem gecikmesi (180 ms avans)
+  max_roll_gate_deg: 15.0     # 15 dereceden fazla yatışta atış yapma
+  max_pitch_gate_deg: 10.0    # 10 dereceden fazla yunuslamada atış yapma
+  persistence_frames: 3       # Hedefin ardışık 3 kare doğrulanması şartı
 
 mavlink:
   # MAVLink connection and fallback flight parameters
