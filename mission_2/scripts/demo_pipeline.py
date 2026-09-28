@@ -31,6 +31,11 @@ import numpy as np
 import yaml
 from pymavlink import mavutil
 
+import sys
+import os
+# [COMPETITION HOTFIX]: Otomatik src yolu bulucu (kuruluma gerek kalmadan her zaman calisir)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 from scandium.control.ballistics import BallisticCalculator
 from scandium.mavlink.payload_controller import PayloadController
 from scandium.perception.geo_projection import GeoProjector
@@ -795,5 +800,6 @@ def main() -> None:  # noqa: C901
 
 if __name__ == "__main__":
     main()
+
 
 
