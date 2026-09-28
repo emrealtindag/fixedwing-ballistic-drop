@@ -1,0 +1,79 @@
+# ============================================================
+#  TEKNOFEST 2026 — Sabit Kanat Görev 2  |  Scandium Config
+#  Güncelleme: 2026-09-06  (v2 — Şartname uyumu)
+# ============================================================
+
+camera:
+  # Kamera monte açıları (derece). Pozitif pitch = aşağıya bakar.
+  mount_pitch_deg: 25.0
+  mount_roll_deg: 0.0
+  # Odak uzunluğu piksel cinsinden (projeksiyon hesapları için)
+  focal_length_px: 1000.0
+  # Görüntü boyutları (piksel)
+  width: 640
+  height: 480
+
+ballistics:
+  # Yük fiziksel parametreleri
+  payload_mass_kg: 0.35        # Teknik kontrolde beyan ettiğiniz değeri girin
+  drag_coeff_cd: 0.45
+  cross_area_m2: 0.008
+  air_density_rho: 1.225
+  dt: 0.01
+  max_simulation_time_s: 60.0
+
+payload:
+  # Servo bırakma ayarları
+  servo_channel: 9
+  pwm_payload_1: 1500          # Yük 1 (Mavi hedefe → KIRMIZI yük)
+  pwm_payload_2: 2000          # Yük 2 (Kırmızı hedefe → MAVİ yük)
+  require_arming: true
+  ack_retries: 2
+  ack_timeout_s: 1.0
+  target_system: 1
+  target_component: 1
+
+mission:
+  # ── Bırakma pencereleri ──────────────────────────────────
+  # Şartname: sabit kanat için puan sıfırlanma sınırı = 20m.
+  # 12m → makul hassasiyet + rüzgar/latency payı
+  release_tolerance_m: 12.0   # (önceki: 3.0 — çok sıkı, 0 puan riski vardı)
+  lateral_tolerance_m: 6.0    # (önceki: 2.0)
+
+  # ── Algılama modeli ──────────────────────────────────────
+  conf_threshold: 0.65
+  use_contour_check: false
+  model_path: "weights/best.pt"
+
+  # ── Gecikme ve tutum kapıları ────────────────────────────
+  system_latency_s: 0.180      # Toplam sistem gecikmesi avansı (servo + kod)
+  max_roll_gate_deg: 15.0      # Bu açının üzerinde yatışta atış yapma
+  max_pitch_gate_deg: 10.0     # Bu açının üzerinde yunuslamada atış yapma
+
+  # ── Yanlış pozitif koruması ──────────────────────────────
+  # Hedefin N ardışık kare boyunca tolerans penceresinde kalması şartı.
+  # (Önceden YAML'da vardı ama kod okumuyor — artık aktif!)
+  persistence_frames: 3
+
+  # ── SHGM irtifa limiti ───────────────────────────────────
+  max_altitude_m: 120.0        # Sivil havacılık üst sınırı
+
+  # ── 2. DİREK GPS KİLİDİ (Şartname zorunluluğu) ──────────
+  # Şartname: "Hedef tespiti, 2. direği dışarıdan aldıktan sonra
+  # başlamalıdır." Bu alan doldurulmazsa zaman kilidi (fallback) devreye girer.
+  #
+  # ❗ DOLDURUN: Yarışma sahasındaki 2. direğin GPS koordinatları
+  wp2_lat: null                # Örnek: 38.123456
+  wp2_lon: null                # Örnek: 27.654321
+  wp2_radius_m: 35.0           # Direği "geçti" sayılan yarıçap (metre)
+
+  # Fallback: GPS koordinatı yoksa, kalkıştan (ARMED) bu kadar süre sonra
+  # algılamayı aç. 2. direği döndükten sonra hedef aramaya başladığınızı
+  # operasyonel olarak doğrulamanız gerekir.
+  search_unlock_delay_s: 45.0
+
+mavlink:
+  # MAVLink bağlantı ve varsayılan uçuş parametreleri
+  connection_string: "udp:127.0.0.1:14551"
+  fallback_altitude_m: 40.0
+  fallback_airspeed_mps: 18.0

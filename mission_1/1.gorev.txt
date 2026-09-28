@@ -1,0 +1,8 @@
+bizim bugün uçağı o hantal halinden kurtarıp, jilet gibi 8 çizmesini sağlayan o 3 sihirli otopilot ayarını şu an sadece simülatördeki sanal uçağın beynine kaydettik.
+
+yarın öbür gün gerçek İHA'nızın içindeki Pixhawk'ı bilgisayara bağladığınızda, o ayarlar fabrikasyon (yani hantal) halinde olacak. Gerçek uçakta da bu pürüzsüzlüğü yakalamak için şu ayarları takımın WhatsApp grubuna veya not defterine şimdiden "Görev 1 Uçuş Ayarları" diye mutlaka kaydet:
+
+WP_RADIUS = 10 (Köşeleri içeriden kesmemesi için)
+NAVL1_PERIOD = 13 (Uçağın rotaya agresif ve kıvrak tutunması için)
+RTL_AUTOLAND = 1 (Rotanın sonundaki otonom inişin çalışması için)
+bu parametreleri bir yere not aldıysan, Görev 1 (Otonom Uçuş) defterini resmi olarak kapatabiliriz.
