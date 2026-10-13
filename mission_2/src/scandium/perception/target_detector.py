@@ -92,9 +92,22 @@ class YOLOTargetDetector:
         self.conf_threshold = float(conf_threshold)
         self.use_contour_check = bool(use_contour_check)
 
-    def _extract_boxes_from_result(self, res) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Extract xyxy, confidences and class ids from a Ultralyics result.
+    def _extract_boxes_from_result(self, res):
+        boxes = getattr(res, "boxes", None)
+        import numpy as np
+        if boxes is None or len(boxes) == 0:
+            return (np.zeros((0, 4), dtype=float), np.zeros((0,), dtype=float), np.zeros((0,), dtype=int))
+        try:
+            xyxy = boxes.xyxy.detach().cpu().numpy().astype(float) if hasattr(boxes.xyxy, 'detach') else np.array(boxes.xyxy)
+            confs = boxes.conf.detach().cpu().numpy().astype(float) if hasattr(boxes.conf, 'detach') else np.array(boxes.conf)
+            cls = boxes.cls.detach().cpu().numpy().astype(int) if hasattr(boxes.cls, 'detach') else np.array(boxes.cls)
+            return xyxy, confs, cls
+        except Exception as e:
+            print(f"[ERROR] Bbox extraction failed: {e}")
+            return (np.zeros((0, 4), dtype=float), np.zeros((0,), dtype=float), np.zeros((0,), dtype=int))
 
+    def _OLD_extract_boxes_from_result(self, res):
+        """
         The Ultralytics `res` object may present data in different formats
         depending on versions (tensors, lists). This helper tries common
         access patterns and returns numpy arrays: xyxy (N,4), confs (N,), cls (N,).
@@ -217,12 +230,12 @@ class YOLOTargetDetector:
 
             # Minimum area filter (pixels)
             area = w * h
-            if area < 400:
+            if area < 50:
                 continue
 
             # Aspect ratio filter for square-like targets
             aspect = float(w) / float(h) if h != 0 else 0.0
-            if not (0.80 <= aspect <= 1.20):
+            if not (0.50 <= aspect <= 2.00):
                 continue
 
             # Optional contour polygon check (4 corners)
@@ -294,3 +307,4 @@ class YOLOTargetDetector:
             cv2.drawMarker(out, (cx, cy), color=(0, 0, 255), markerType=cv2.MARKER_CROSS, markerSize=8, thickness=1)
 
         return out
+

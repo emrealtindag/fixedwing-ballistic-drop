@@ -1,0 +1,867 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.5">
+  <model name="cessna_c172">
+    <pose>0 0 0.495 0 0 0</pose>
+    
+    <link name="body">
+      <inertial>
+        <mass>680.389</mass>
+        <inertia>
+          <ixx>1285.315427874</ixx>
+          <ixy>0.0</ixy>
+          <iyy>1824.930976707</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>2666.893931043</izz>
+        </inertia>
+        <pose>-0.0414 0 0.9271 0 0 0</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/body.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/body.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+
+      
+      
+
+    <sensor name="camera_front" type="camera">
+  <pose>2.5 0 0.8 0 0 0</pose>
+  <camera>
+    <horizontal_fov>1.047</horizontal_fov>
+    <image>
+      <width>640</width>
+      <height>480</height>
+      <format>R8G8B8</format>
+    </image>
+    <clip>
+      <near>0.1</near>
+      <far>1000</far>
+    </clip>
+  </camera>
+  <always_on>1</always_on>
+  <update_rate>30</update_rate>
+  <visualize>true</visualize>
+  <plugin name="camera_plugin" filename="libgazebo_ros_camera.so">
+    <alwaysOn>true</alwaysOn>
+    <imageTopicName>/camera/image_raw</imageTopicName>
+    <cameraInfoTopicName>/camera/camera_info</cameraInfoTopicName>
+    <updateRate>30.0</updateRate>
+    <cameraName>front_camera</cameraName>
+    <frameName>camera_link</frameName>
+    <CxPrime>320.5</CxPrime>
+    <Cx>320.5</Cx>
+    <Cy>240.5</Cy>
+    <hackBaseline>0</hackBaseline>
+    <focalLength>277.19</focalLength>
+    <distortionK1>0.0</distortionK1>
+    <distortionK2>0.0</distortionK2>
+    <distortionK3>0.0</distortionK3>
+    <distortionT1>0.0</distortionT1>
+    <distortionT2>0.0</distortionT2>
+  </plugin>
+</sensor><sensor name="lidar_down" type="ray">
+  <pose>0 0 -0.5 0 1.570796 0</pose> 
+  <visualize>true</visualize>
+  <update_rate>10</update_rate>
+  <ray>
+    <scan>
+      <horizontal>
+        <samples>1</samples>
+        <resolution>1</resolution>
+        <min_angle>0</min_angle>
+        <max_angle>0</max_angle>
+      </horizontal>
+    </scan>
+    <range>
+      <min>0.1</min>
+      <max>50.0</max>
+      <resolution>0.01</resolution>
+    </range>
+  </ray>
+  <plugin name="lidar_plugin" filename="libgazebo_ros_range.so">
+    <topicName>/lidar/range</topicName>
+    <frameName>lidar_link</frameName>
+    <updateRate>10.0</updateRate>
+    <radiation>infrared</radiation>
+    <fov>0.01</fov>
+  </plugin>
+</sensor></link>
+
+    <link name="left_aileron">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.8434</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.0119</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.855</izz>
+        </inertia>
+        <pose>-1.65 3.7 1.5 0.05 0 -0.12</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/left_aileron.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/left_aileron.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="left_flap">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.6747</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.0242</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.6962</izz>
+        </inertia>
+        <pose>-1.8 1.55 1.43 0.02 0 0</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/left_flap.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/left_flap.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="right_aileron">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.8434</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.0119</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.855</izz>
+        </inertia>
+        <pose>-1.65 -3.7 1.5 -0.05 0 0.12</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/right_aileron.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/right_aileron.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="right_flap">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.6747</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.0242</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.6962</izz>
+        </inertia>
+        <pose>-1.8 -1.55 1.43 -0.02 0 0</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/right_flap.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/right_flap.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="elevators">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>1.5008</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.0274</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>1.5266</izz>
+        </inertia>
+        <pose>-5.75 0 0.57 0 0 0</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/elevators.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/elevators.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="rudder">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.4708</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.5208</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.0508</izz>
+        </inertia>
+        <pose>-6.1 0 1.3 0 -0.35 0</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/rudder.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/rudder.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="propeller">
+      <pose>1.79 0 0.855 0 0 0</pose>
+      <inertial>
+        <mass>18.37</mass>
+        <inertia>
+          <ixx>7.5067</ixx>
+          <ixy>0</ixy>
+          <iyy>7.5150</iyy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+          <izz>0.068275</izz>
+        </inertia>
+        <pose>-0.35 0 0 0 0 0</pose>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          
+          
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/cessna_prop.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/cessna_prop.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="front_wheel">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.01786</ixx>
+          <ixy>0</ixy>
+          <iyy>0.01786</iyy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+          <izz>0.0324</izz>
+        </inertia>
+        <pose>0.712 0 -0.313 1.570795 0 0</pose>
+      </inertial>
+      <collision name="collision">
+        <pose>0.712 0 -0.313 1.570795 0 0</pose>
+        <geometry>
+          <cylinder>
+              <radius>0.18</radius>
+              <length>0.1</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.3</mu>
+              <mu2>0.3</mu2>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/cessna_front_wheel.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="rear_left_wheel">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.035516</ixx>
+          <ixy>0</ixy>
+          <iyy>0.035516</iyy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+          <izz>0.0625</izz>
+        </inertia>
+        <pose>-1 1.27 -0.25 1.570795 0 0</pose>
+      </inertial>
+      <collision name="collision">
+        <pose>-1 1.27 -0.25 1.570795 0 0</pose>
+        <geometry>
+          <cylinder>
+              <radius>0.25</radius>
+              <length>0.16</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.3</mu>
+              <mu2>0.3</mu2>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/cessna_rear_left_wheel.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <link name="rear_right_wheel">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.035516</ixx>
+          <ixy>0</ixy>
+          <iyy>0.035516</iyy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+          <izz>0.0625</izz>
+        </inertia>
+        <pose>-1 -1.27 -0.25 1.570795 0 0</pose>
+      </inertial>
+      <collision name="collision">
+        <pose>-1 -1.27 -0.25 1.570795 0 0</pose>
+        <geometry>
+          <cylinder>
+              <radius>0.25</radius>
+              <length>0.16</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.3</mu>
+              <mu2>0.3</mu2>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cessna_with_ardupilot/meshes/cessna_rear_right_wheel.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    
+    <joint name="left_flap_joint" type="revolute">
+      <parent>body</parent>
+      <child>left_flap</child>
+      <pose>-1.6 1.55 1.43 0.02 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="left_aileron_joint" type="revolute">
+      <parent>body</parent>
+      <child>left_aileron</child>
+      <pose>-1.45 3.7 1.5 0.05 0 -0.12</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="right_flap_joint" type="revolute">
+      <parent>body</parent>
+      <child>right_flap</child>
+      <pose>-1.6 -1.55 1.43 -0.02 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="right_aileron_joint" type="revolute">
+      <parent>body</parent>
+      <child>right_aileron</child>
+      <pose>-1.45 -3.7 1.5 -0.05 0 0.12</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="elevators_joint" type="revolute">
+      <parent>body</parent>
+      <child>elevators</child>
+      <pose>-5.55 0 0.57 0 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="rudder_joint" type="revolute">
+      <parent>body</parent>
+      <child>rudder</child>
+      <pose>-5.9 0 1.3 0 -0.35 0</pose>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="propeller_joint" type="revolute">
+      <parent>body</parent>
+      <child>propeller</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1e+12</lower>
+          <upper>1e+12</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.001</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="front_wheel_joint" type="revolute">
+      <parent>body</parent>
+      <child>front_wheel</child>
+      <pose>0.712 0 -0.313 0 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1e+12</lower>
+          <upper>1e+12</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.010</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="rear_left_wheel_joint" type="revolute">
+      <parent>body</parent>
+      <child>rear_left_wheel</child>
+      <pose>-1 -1.27 -0.25 0 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1e+12</lower>
+          <upper>1e+12</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.010</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+    
+    <joint name="rear_right_wheel_joint" type="revolute">
+      <parent>body</parent>
+      <child>rear_right_wheel</child>
+      <pose>-1 1.27 -0.25 0 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1e+12</lower>
+          <upper>1e+12</upper>
+          <effort>-1</effort>
+          <velocity>-1</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.010</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+
+  <plugin name="ardupilot_plugin" filename="libardupilot_gazebo.so">
+      <fdm_addr>127.0.0.1</fdm_addr>
+      <fdm_port_in>9002</fdm_port_in>
+      <fdm_port_out>9003</fdm_port_out>
+      <modelXYZToAirplaneXForwardZDown>0 0 0 3.141593 0 0</modelXYZToAirplaneXForwardZDown>
+      <gazeboXYZToNED>0 0 0 3.141593 0 0</gazeboXYZToNED>
+      
+      <control channel="0">
+        
+        <type>POSITION</type>
+        <offset>-0.5</offset>
+        <p_gain>10.0</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>0</d_gain>
+        <i_max>0</i_max>
+        <i_min>0</i_min>
+        <cmd_max>1.0</cmd_max>
+        <cmd_min>-1.0</cmd_min>
+        <jointName>left_aileron_joint</jointName>
+        <multiplier>0.53</multiplier>
+        <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+      </control>
+      <control channel="0">
+        <type>POSITION</type>
+        <offset>-0.5</offset>
+        <p_gain>10.0</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>0</d_gain>
+        <i_max>0</i_max>
+        <i_min>0</i_min>
+        <cmd_max>1.0</cmd_max>
+        <cmd_min>-1.0</cmd_min>
+        <jointName>right_aileron_joint</jointName>
+        <multiplier>-0.53</multiplier>
+        <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+      </control>
+
+      <control channel="1">
+        
+        <type>POSITION</type>
+        <offset>-0.5</offset>
+        <p_gain>10.0</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>0</d_gain>
+        <i_max>0</i_max>
+        <i_min>0</i_min>
+        <cmd_max>1.0</cmd_max>
+        <cmd_min>-1.0</cmd_min>
+        <jointName>elevators_joint</jointName>
+        <multiplier>0.53</multiplier>
+        <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+      </control>
+
+      <control channel="2">
+        
+        <type>VELOCITY</type>
+        <offset>0</offset>
+        <p_gain>1.0</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>0</d_gain>
+        <i_max>0</i_max>
+        <i_min>0</i_min>
+        <cmd_max>1000.0</cmd_max>
+        <cmd_min>0.0</cmd_min>
+        <jointName>propeller_joint</jointName>
+        <multiplier>1000.0</multiplier>
+        <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+      </control>
+
+      <control channel="3">
+        
+        <type>POSITION</type>
+        <offset>-0.5</offset>
+        <p_gain>10.0</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>0</d_gain>
+        <i_max>0</i_max>
+        <i_min>0</i_min>
+        <cmd_max>1.0</cmd_max>
+        <cmd_min>-1.0</cmd_min>
+        <jointName>rudder_joint</jointName>
+        <multiplier>-0.53</multiplier>
+        <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+      </control>
+    </plugin>
+    
+    
+    <plugin name="left_wing_lift" filename="libLiftDragPlugin.so">
+      <a0>0.05984281113</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>-1.8</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-1 2.2 1.5</cp>
+      <area>8.08255</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>body</link_name>
+      <control_joint_name>left_aileron_joint</control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+    </plugin>
+
+    <plugin name="right_wing_lift" filename="libLiftDragPlugin.so">
+      <a0>0.05984281113</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>-1.8</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-1 -2.2 1.5</cp>
+      <area>8.08255</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>body</link_name>
+      <control_joint_name>right_aileron_joint</control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+    </plugin>
+
+    <plugin name="elevator_lift" filename="libLiftDragPlugin.so">
+      <a0>-0.2</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>-1.8</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-5.5 0 0.55</cp>
+      <area>2.5</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>body</link_name>
+      <control_joint_name>elevators_joint</control_joint_name>
+      <control_joint_rad_to_cl>-1.5</control_joint_rad_to_cl>
+    </plugin>
+    
+    <plugin name="rudder_lift" filename="libLiftDragPlugin.so">
+      <a0>0</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>-1.8</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-6 0 1.55</cp>
+      <area>2.0</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 1 0</upward>
+      <link_name>body</link_name>
+      <control_joint_name>rudder_joint</control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+    </plugin>
+</model>
+</sdf>

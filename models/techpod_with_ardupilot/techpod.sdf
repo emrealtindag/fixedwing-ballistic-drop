@@ -1,0 +1,777 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.6">
+  <model name="techpod">
+    <pose>0 0 0.246 0 0 0</pose>
+    <link name="base_link">
+      <pose>0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0.15 0 0.1 0 -0 0</pose>
+        <mass>2.05</mass>
+        <inertia>
+          <ixx>0.16632</ixx>
+          <ixy>0</ixy>
+          <ixz>0.0755</ixz>
+          <iyy>0.3899</iyy>
+          <iyz>0</iyz>
+          <izz>0.5243</izz>
+        </inertia>
+      </inertial>
+      <collision name="base_link_collision">
+        <pose>0 0 -0.07 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>1.088 2.591 0.103</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <max_vel>10</max_vel>
+              <min_depth>0.01</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+      <visual name="base_link_inertia_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_body.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/DarkGray</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+      <gravity>1</gravity>
+      <velocity_decay />
+      <self_collide>0</self_collide>
+    <sensor name="camera_front" type="camera">
+  <pose>0.15 0 0.15 0 0 0</pose>
+  <camera>
+    <horizontal_fov>1.047</horizontal_fov>
+    <image>
+      <width>640</width>
+      <height>480</height>
+      <format>R8G8B8</format>
+    </image>
+    <clip>
+      <near>0.1</near>
+      <far>1000</far>
+    </clip>
+  </camera>
+  <always_on>1</always_on>
+  <update_rate>30</update_rate>
+  <visualize>true</visualize>
+  <plugin name="camera_plugin_front" filename="libgazebo_ros_camera.so">
+    <alwaysOn>true</alwaysOn>
+    <imageTopicName>/camera/image_raw</imageTopicName>
+    <cameraInfoTopicName>/camera/camera_info</cameraInfoTopicName>
+    <updateRate>30.0</updateRate>
+    <cameraName>front_camera</cameraName>
+    <frameName>camera_link</frameName>
+  </plugin>
+</sensor>
+
+<sensor name="downward_camera" type="camera">
+  <pose>0 0 -0.05 0 1.570796 0</pose>
+  <camera>
+    <horizontal_fov>1.047</horizontal_fov>
+    <image>
+      <width>640</width>
+      <height>480</height>
+      <format>R8G8B8</format>
+    </image>
+    <clip>
+      <near>0.1</near>
+      <far>1000</far>
+    </clip>
+  </camera>
+  <always_on>1</always_on>
+  <update_rate>30</update_rate>
+  <visualize>true</visualize>
+  <plugin name="camera_plugin_down" filename="libgazebo_ros_camera.so">
+    <alwaysOn>true</alwaysOn>
+    <imageTopicName>/downward_camera/image_raw</imageTopicName>
+    <cameraInfoTopicName>/downward_camera/camera_info</cameraInfoTopicName>
+    <updateRate>30.0</updateRate>
+    <cameraName>downward_camera</cameraName>
+    <frameName>downward_camera_link</frameName>
+  </plugin>
+</sensor>
+
+<sensor name="lidar_down" type="ray">
+  <pose>0 0 -0.05 0 1.570796 0</pose>
+  <visualize>true</visualize>
+  <update_rate>10</update_rate>
+  <ray>
+    <scan>
+      <horizontal>
+        <samples>1</samples>
+        <resolution>1</resolution>
+        <min_angle>0</min_angle>
+        <max_angle>0</max_angle>
+      </horizontal>
+    </scan>
+    <range>
+      <min>0.1</min>
+      <max>50.0</max>
+      <resolution>0.01</resolution>
+    </range>
+  </ray>
+  <plugin name="lidar_plugin" filename="libgazebo_ros_range.so">
+    <topicName>/lidar/range</topicName>
+    <frameName>lidar_link</frameName>
+    <updateRate>10.0</updateRate>
+    <radiation>infrared</radiation>
+    <fov>0.01</fov>
+  </plugin>
+</sensor>
+</link>
+    <link name="techpod/imu_link">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.015</mass>
+        <inertia>
+          <ixx>1e-05</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1e-05</iyy>
+          <iyz>0</iyz>
+          <izz>1e-05</izz>
+        </inertia>
+      </inertial>
+    </link>
+    <joint name="techpod/imu_joint" type="revolute">
+      <child>techpod/imu_link</child>
+      <parent>base_link</parent>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>0</lower>
+          <upper>0</upper>
+          <effort>0</effort>
+          <velocity>0</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+        <use_parent_model_frame>1</use_parent_model_frame>
+      </axis>
+    </joint>
+    <link name="rotor_puller">
+      <pose>-0.025 0 0.15 0 1.57 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.005</mass>
+        <inertia>
+          <ixx>9.75e-07</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.000166704</iyy>
+          <iyz>0</iyz>
+          <izz>0.000167604</izz>
+        </inertia>
+      </inertial>
+      <collision name="rotor_puller_collision">
+        <pose>0.0 0 0.0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.005</length>
+            <radius>0.1</radius>
+          </cylinder>
+        </geometry>
+        <surface>
+          <contact>
+            <ode />
+          </contact>
+          <friction>
+            <ode />
+          </friction>
+        </surface>
+      </collision>
+      <visual name="techpod/propeller__visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1.0 1.0 1.0</scale>
+            <uri>model://techpod_with_ardupilot/meshes/propeller_cw.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+      <gravity>1</gravity>
+      <velocity_decay />
+      <self_collide>0</self_collide>
+    </link>
+    <joint name="rotor_puller_joint" type="revolute">
+      <child>rotor_puller</child>
+      <parent>base_link</parent>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+        <use_parent_model_frame>1</use_parent_model_frame>
+      </axis>
+    </joint>
+    <link name="left_elevon">
+      <pose>0.1095 0.99245 0.115 0 -0 0</pose>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.000001</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+        <pose>0 0.3 0 0.00 0 0.0</pose>
+      </inertial>
+      <visual name="left_elevon_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_aileron_left.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <link name="right_elevon">
+      <pose>0.1095 -0.99245 0.115 0 -0 0</pose>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.000001</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+        <pose>0 -0.3 0 0.00 0 0.0</pose>
+      </inertial>
+      <visual name="right_evelon_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_aileron_right.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <link name="left_flap">
+      <pose>0.101 0.382 0.1185 0 -0 0</pose>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.000001</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+        <pose>0 0.15 0 0.00 0 0.0</pose>
+      </inertial>
+      <visual name="techpod/flap_left_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_flap_left.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <link name="right_flap">
+      <pose>0.101 -0.382 0.1185 0 -0 0</pose>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.000001</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+        <pose>0 -0.15 0 0.00 0 0.0</pose>
+      </inertial>
+      <visual name="techpod/flap_right_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_flap_right.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <link name="elevator">
+      <pose>-0.555 0 0.26 0 -0 0</pose>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.000001</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+        <pose> -0.5 0 0 0.00 0 0.0</pose>
+      </inertial>
+      <visual name="elevator_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_elevator.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <link name="rudder">
+      <pose>-0.428 0 0 0 -0.25 0</pose>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <iyy>0.000001</iyy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+        <pose>-0.5 0 0.05 0 0 0 </pose>
+      </inertial>
+      <visual name="rudder_visual">
+        <pose>0 0 0 0 0.25 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://techpod_with_ardupilot/meshes/techpod_rudder.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Blue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <joint name="left_elevon_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>left_elevon</child>
+      <pose>-0.0 0.0 0.0 0.00 0 0.0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+    <joint name="right_elevon_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>right_elevon</child>
+      <pose>-0.0 -0.0 0.0 0.00 0 0.0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+    <joint name="left_flap_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>left_flap</child>
+      <pose>-0.0 0.0 0.0 0.00 0 0.0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+    <joint name="right_flap_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>right_flap</child>
+      <pose>-0.0 -0.0 0.0 0.00 0 0.0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+    <joint name="elevator_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>elevator</child>
+      <pose> -0.0 0 0 0 0 0</pose>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+    <joint name="rudder_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rudder</child>
+      <pose>-0 0 0.05 0.00 0 0.0</pose>
+      <axis>
+        <xyz>-0.247404 0 0.968912</xyz>
+        <limit>
+          
+          <lower>-0.53</lower>
+          <upper>0.53</upper>
+        </limit>
+        <dynamics>
+          <damping>1.000</damping>
+        </dynamics>
+      </axis>
+      <physics>
+        <ode>
+          <implicit_spring_damper>1</implicit_spring_damper>
+        </ode>
+      </physics>
+    </joint>
+    <include>
+      <uri>model://gps</uri>
+      <pose>0 0 0 0 0 0</pose>
+      <name>gps</name>
+    </include>
+    <joint name="gps_joint" type="fixed">
+      <child>gps::link</child>
+      <parent>base_link</parent>
+    </joint>
+    <include>
+      <uri>model://airspeed</uri>
+      <pose>0 0 0 0 0 0</pose>
+      <name>airspeed</name>
+    </include>
+    <joint name="airspeed_joint" type="fixed">
+      <child>airspeed::link</child>
+      <parent>base_link</parent>
+    </joint>
+    <plugin name="left_wing" filename="libLiftDragPlugin.so">
+      <a0>0.05984281113</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>0.0</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-0.05 0.45 0.05</cp>
+      <area>0.6</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>base_link</link_name>
+      <control_joint_name>
+        left_elevon_joint
+      </control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+      <robotNamespace />
+      <windSubTopic>world_wind</windSubTopic>
+    </plugin>
+    <plugin name="right_wing" filename="libLiftDragPlugin.so">
+      <a0>0.05984281113</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>0.0</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-0.05 -0.45 0.05</cp>
+      <area>0.6</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>base_link</link_name>
+      <control_joint_name>
+        right_elevon_joint
+      </control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+      <robotNamespace />
+      <windSubTopic>world_wind</windSubTopic>
+    </plugin>
+    <plugin name="left_flap" filename="libLiftDragPlugin.so">
+      <a0>0.05984281113</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>0.0</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-0.05 0.15 0.05</cp>
+      <area>0.6</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>base_link</link_name>
+      <control_joint_name>
+        left_flap_joint
+      </control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+      <robotNamespace />
+      <windSubTopic>world_wind</windSubTopic>
+    </plugin>
+    <plugin name="right_flap" filename="libLiftDragPlugin.so">
+      <a0>0.05984281113</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>0.0</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-0.05 -0.15 0.05</cp>
+      <area>0.6</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>base_link</link_name>
+      <control_joint_name>
+        right_flap_joint
+      </control_joint_name>
+      <control_joint_rad_to_cl>-0.5</control_joint_rad_to_cl>
+      <robotNamespace />
+      <windSubTopic>world_wind</windSubTopic>
+    </plugin>
+    <plugin name="elevator" filename="libLiftDragPlugin.so">
+      <a0>-0.2</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>0.0</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-0.5 0 0</cp>
+      <area>0.01</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0 1</upward>
+      <link_name>base_link</link_name>
+      <control_joint_name>
+        elevator_joint
+      </control_joint_name>
+      <control_joint_rad_to_cl>-4.0</control_joint_rad_to_cl>
+      <robotNamespace />
+      <windSubTopic>world_wind</windSubTopic>
+    </plugin>
+    <plugin name="rudder" filename="libLiftDragPlugin.so">
+      <a0>0.0</a0>
+      <cla>4.752798721</cla>
+      <cda>0.6417112299</cda>
+      <cma>0.0</cma>
+      <alpha_stall>0.3391428111</alpha_stall>
+      <cla_stall>-3.85</cla_stall>
+      <cda_stall>-0.9233984055</cda_stall>
+      <cma_stall>0</cma_stall>
+      <cp>-0.5 0 0.05</cp>
+      <area>0.02</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 1 0</upward>
+      <link_name>base_link</link_name>
+      <control_joint_name>
+         rudder_joint
+      </control_joint_name>
+      <control_joint_rad_to_cl>0.8</control_joint_rad_to_cl>
+      <robotNamespace />
+      <windSubTopic>world_wind</windSubTopic>
+    </plugin>
+    <static>0</static>
+  <plugin name="ardupilot_plugin" filename="libardupilot_gazebo.so">
+  <fdm_addr>127.0.0.1</fdm_addr>
+  <fdm_port_in>9002</fdm_port_in>
+  <fdm_port_out>9003</fdm_port_out>
+  <modelXYZToAirplaneXForwardZDown>0 0 0 3.141593 0 0</modelXYZToAirplaneXForwardZDown>
+  <gazeboXYZToNED>0 0 0 3.141593 0 0</gazeboXYZToNED>
+  
+  <control channel="0">
+    
+    <type>POSITION</type>
+    <offset>-0.5</offset>
+    <p_gain>10.0</p_gain>
+    <i_gain>0</i_gain>
+    <d_gain>0</d_gain>
+    <i_max>0</i_max>
+    <i_min>0</i_min>
+    <cmd_max>1.0</cmd_max>
+    <cmd_min>-1.0</cmd_min>
+    <jointName>left_elevon_joint</jointName>
+    <multiplier>0.53</multiplier>
+    <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+  </control>
+  <control channel="0">
+    
+    <type>POSITION</type>
+    <offset>-0.5</offset>
+    <p_gain>10.0</p_gain>
+    <i_gain>0</i_gain>
+    <d_gain>0</d_gain>
+    <i_max>0</i_max>
+    <i_min>0</i_min>
+    <cmd_max>1.0</cmd_max>
+    <cmd_min>-1.0</cmd_min>
+    <jointName>right_elevon_joint</jointName>
+    <multiplier>-0.53</multiplier>
+    <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+  </control>
+
+  <control channel="1">
+    
+    <type>POSITION</type>
+    <offset>-0.5</offset>
+    <p_gain>10.0</p_gain>
+    <i_gain>0</i_gain>
+    <d_gain>0</d_gain>
+    <i_max>0</i_max>
+    <i_min>0</i_min>
+    <cmd_max>1.0</cmd_max>
+    <cmd_min>-1.0</cmd_min>
+    <jointName>elevator_joint</jointName>
+    <multiplier>0.53</multiplier>
+    <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+  </control>
+
+  <control channel="2">
+    
+    <type>VELOCITY</type>
+    <offset>0</offset>
+    <p_gain>0.5</p_gain>
+    <i_gain>0</i_gain>
+    <d_gain>0</d_gain>
+    <i_max>0</i_max>
+    <i_min>0</i_min>
+    <cmd_max>3500.0</cmd_max>
+    <cmd_min>0.0</cmd_min>
+    <jointName>rotor_puller_joint</jointName>
+    <multiplier>3500.0</multiplier>
+    <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+  </control>
+
+  <control channel="3">
+    
+    <type>POSITION</type>
+    <offset>-0.5</offset>
+    <p_gain>10.0</p_gain>
+    <i_gain>0</i_gain>
+    <d_gain>0</d_gain>
+    <i_max>0</i_max>
+    <i_min>0</i_min>
+    <cmd_max>1.0</cmd_max>
+    <cmd_min>-1.0</cmd_min>
+    <jointName>rudder_joint</jointName>
+    <multiplier>-0.53</multiplier>
+    <controlVelocitySlowdownSim>1</controlVelocitySlowdownSim>
+  </control>
+</plugin></model>
+</sdf>

@@ -1,0 +1,23 @@
+    <!-- Kirmizi Hedef (Red Target) -->
+    <model name="red_target">
+      <static>true</static>
+      <pose>80 0 0.1 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>2 2 0.01</size></box></geometry>
+          <material><ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    
+    <!-- Mavi Hedef (Blue Target) -->
+    <model name="blue_target">
+      <static>true</static>
+      <pose>140 0 0.1 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>2 2 0.01</size></box></geometry>
+          <material><ambient>0 0 1 1</ambient><diffuse>0 0 1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>

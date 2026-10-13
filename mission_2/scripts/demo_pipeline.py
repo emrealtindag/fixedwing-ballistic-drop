@@ -1,18 +1,18 @@
-﻿"""scripts.demo_pipeline
+"""scripts.demo_pipeline
 
-Fixed-Wing Mission 2 Master Pipeline â€” TEKNOFEST 2026  (v2)
+Fixed-Wing Mission 2 Master Pipeline  TEKNOFEST 2026  (v2)
 
-DÃ¼zeltmeler ve eklemeler (v1 â†’ v2):
-  [FIX-1]  predict_drop_offset_world() metot imzasÄ± dÃ¼zeltildi (AttributeError gideridi).
-  [FIX-2]  draw_detections() dÃ¶nÃ¼ÅŸ deÄŸeri frame'e atandÄ± â€” HUD'da kutular artÄ±k gÃ¶rÃ¼nÃ¼yor.
-  [NEW-1]  DetectionGate: Åartname gereÄŸi 2. direk GPS kilidi.
-           GPS koordinatÄ± girilmiÅŸse haversine mesafesiyle, girilmemiÅŸse
-           kalkÄ±ÅŸtan N saniye sonra (search_unlock_delay_s) algÄ±lamayÄ± aÃ§ar.
-  [NEW-2]  PersistenceTracker: YanlÄ±ÅŸ pozitif korumasÄ± â€” hedef N ardÄ±ÅŸÄ±k
-           kare boyunca tolerans penceresinde gÃ¶rÃ¼lmeden yÃ¼k bÄ±rakÄ±lmÄ±yor.
-  [NEW-3]  GeliÅŸtirilmiÅŸ HUD: kilit durumu, sÄ±nÄ±f adÄ±, persistence sayacÄ±,
-           SHGM irtifa uyarÄ±sÄ±.
-  [NEW-4]  YÃ¼kseklik Ã¼st sÄ±nÄ±rÄ± (120m) ihlal uyarÄ±sÄ±.
+Dzeltmeler ve eklemeler (v1  v2):
+  [FIX-1]  predict_drop_offset_world() metot imzas dzeltildi (AttributeError gideridi).
+  [FIX-2]  draw_detections() dn deeri frame'e atand  HUD'da kutular artk grnyor.
+  [NEW-1]  DetectionGate: artname gerei 2. direk GPS kilidi.
+           GPS koordinat girilmise haversine mesafesiyle, girilmemise
+           kalktan N saniye sonra (search_unlock_delay_s) alglamay aar.
+  [NEW-2]  PersistenceTracker: Yanl pozitif korumas  hedef N ardk
+           frames boyunca tolerans penceresinde grlmeden yk braklmyor.
+  [NEW-3]  Gelitirilmi HUD: kilit durumu, snf ad, persistence sayac,
+           SHGM irtifa uyars.
+  [NEW-4]  Ykseklik st snr (120m) ihlal uyars.
   [NEW-5]  TelemetryDispatcher: GLOBAL_POSITION_INT'den lat/lon takibi eklendi.
 """
 from __future__ import annotations
@@ -41,7 +41,7 @@ from scandium.mavlink.payload_controller import PayloadController
 from scandium.perception.geo_projection import GeoProjector
 from scandium.perception.target_detector import TargetDetection, YOLOTargetDetector
 
-# â”€â”€ SHGM Ä°rtifa Limiti â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  SHGM rtifa Limiti 
 MAX_ALTITUDE_SHGM_M = 120.0
 
 logging.basicConfig(
@@ -51,18 +51,18 @@ logging.basicConfig(
 logger = logging.getLogger("mission2_pipeline")
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# YardÄ±mcÄ± Fonksiyonlar
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
+# Yardmc Fonksiyonlar
+# 
 
 def haversine_distance_m(
     lat1_deg: float, lon1_deg: float,
     lat2_deg: float, lon2_deg: float,
 ) -> float:
-    """Ä°ki GPS koordinatÄ± arasÄ±ndaki yÃ¼zey mesafesini metre cinsinden dÃ¶ner.
+    """ki GPS koordinat arasndaki yzey mesafesini metre cinsinden dner.
 
-    KÃ¼resel DÃ¼nya modeli (R = 6 371 000 m) kullanÄ±r; yarÄ±ÅŸma sahasÄ±ndaki
-    kÄ±sa mesafeler (< 5 km) iÃ§in yeterli hassasiyettedir.
+    Kresel Dnya modeli (R = 6 371 000 m) kullanr; yarma sahasndaki
+    ksa mesafeler (< 5 km) iin yeterli hassasiyettedir.
     """
     R = 6_371_000.0
     phi1 = math.radians(lat1_deg)
@@ -73,9 +73,9 @@ def haversine_distance_m(
     return R * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
 # Telemetri
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
 
 @dataclasses.dataclass
 class TelemetryField:
@@ -87,10 +87,10 @@ class TelemetryField:
 
 
 class TelemetryDispatcher:
-    """Tekil MAVLink alÄ±cÄ±sÄ±: Telemetriyi Ã¶nbelleÄŸe alÄ±r ve ACK'leri yÃ¶nlendirir.
+    """Tekil MAVLink alcs: Telemetriyi nbellee alr ve ACK'leri ynlendirir.
 
-    v2 deÄŸiÅŸikliÄŸi: GLOBAL_POSITION_INT'den lat/lon alanlarÄ± eklendi â€”
-    DetectionGate'in GPS tabanlÄ± 2. direk kilidi iÃ§in gerekli.
+    v2 deiiklii: GLOBAL_POSITION_INT'den lat/lon alanlar eklendi 
+    DetectionGate'in GPS tabanl 2. direk kilidi iin gerekli.
     """
 
     def __init__(
@@ -110,7 +110,7 @@ class TelemetryDispatcher:
         self.wind_xyz: Tuple[float, float, float] = (0.0, 0.0, 0.0)
         self.wind_ts = now
 
-        # [NEW-5] GPS konum takibi (DetectionGate iÃ§in)
+        # [NEW-5] GPS konum takibi (DetectionGate iin)
         self.lat_deg: Optional[float] = None
         self.lon_deg: Optional[float] = None
 
@@ -146,7 +146,7 @@ class TelemetryDispatcher:
 
             elif t == "VFR_HUD":
                 self.airspeed = TelemetryField(float(getattr(msg, "airspeed", self.airspeed.value)), now)
-                self.altitude_agl = TelemetryField(float(getattr(msg, "alt", self.altitude_agl.value)), now)
+                # Removed VFR_HUD alt override to prevent AMSL overriding AGL
 
             elif t == "GLOBAL_POSITION_INT":
                 rel_alt = getattr(msg, "relative_alt", None)
@@ -154,7 +154,7 @@ class TelemetryDispatcher:
                     self.altitude_agl = TelemetryField(rel_alt / 1000.0, now)
                 self.ground_vx = TelemetryField(float(msg.vx) / 100.0, now)
                 self.ground_vy = TelemetryField(float(msg.vy) / 100.0, now)
-                # [NEW-5] lat/lon (1e-7 derece â†’ derece)
+                # [NEW-5] lat/lon (1e-7 derece  derece)
                 raw_lat = getattr(msg, "lat", None)
                 raw_lon = getattr(msg, "lon", None)
                 if raw_lat is not None:
@@ -195,19 +195,19 @@ class TelemetryDispatcher:
         return True
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# [NEW-1] AlgÄ±lama Kilidi â€” 2. Direk GPS GeÃ§iÅŸ DenetÃ§isi
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
+# [NEW-1] Alglama Kilidi  2. Direk GPS Gei Denetisi
+# 
 
 class DetectionGate:
-    """Åartname gereÄŸi hedef tespitini 2. direk geÃ§iÅŸine kadar kilitler.
+    """artname gerei hedef tespitini 2. direk geiine kadar kilitler.
 
-    Ã‡alÄ±ÅŸma mantÄ±ÄŸÄ± (Ã¶ncelik sÄ±rasÄ±yla):
-    1. GPS koordinatÄ± girilmiÅŸse: Ä°HA'nÄ±n wp2 yarÄ±Ã§apÄ±na girip Ã§Ä±kmasÄ±nÄ± bekler.
-    2. GPS koordinatÄ± girilmemiÅŸse (null): ARMED anÄ±ndan itibaren
-       ``search_unlock_delay_s`` saniye geÃ§ince kilidi aÃ§ar (fallback).
+    alma mant (ncelik srasyla):
+    1. GPS koordinat girilmise: HA'nn wp2 yarapna girip kmasn bekler.
+    2. GPS koordinat girilmemise (null): ARMED anndan itibaren
+       ``search_unlock_delay_s`` saniye geince kilidi aar (fallback).
 
-    Kilit bir kez aÃ§Ä±ldÄ±ktan sonra oturum boyunca aÃ§Ä±k kalÄ±r.
+    Kilit bir kez aldktan sonra oturum boyunca ak kalr.
     """
 
     def __init__(
@@ -223,23 +223,23 @@ class DetectionGate:
         self._unlock_delay_s = float(search_unlock_delay_s)
 
         self._detection_armed = False
-        self._wp2_visited = False      # Ä°HA wp2 yarÄ±Ã§apÄ±na girdi mi?
-        self._arm_ts: Optional[float] = None  # Ä°lk ARMED anÄ±
+        self._wp2_visited = False      # HA wp2 yarapna girdi mi?
+        self._arm_ts: Optional[float] = None  # lk ARMED an
 
         gps_available = wp2_lat is not None and wp2_lon is not None
-        mode = "GPS tabanlÄ±" if gps_available else f"zaman kilidi ({search_unlock_delay_s:.0f}s fallback)"
-        logger.info("DetectionGate baÅŸlatÄ±ldÄ±. Mod: %s", mode)
+        mode = "GPS tabanl" if gps_available else f"timer lock ({search_unlock_delay_s:.0f}s fallback)"
+        logger.info("DetectionGate started. Mode: %s", mode)
 
-    # â”€â”€ DÄ±ÅŸ ArayÃ¼z â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  D Arayz 
 
     @property
     def is_detection_armed(self) -> bool:
-        """True ise hedef tespiti ve bÄ±rakma kararÄ± verilmesine izin var."""
+        """True ise hedef tespiti ve brakma karar verilmesine izin var."""
         return self._detection_armed
 
     @property
     def arm_elapsed_s(self) -> float:
-        """KalkÄ±ÅŸtan (ARMED) bu yana geÃ§en sÃ¼re; kalkÄ±ÅŸ olmadÄ±ysa 0."""
+        """Kalktan (ARMED) bu yana geen sre; kalk olmadysa 0."""
         if self._arm_ts is None:
             return 0.0
         return time.monotonic() - self._arm_ts
@@ -250,24 +250,24 @@ class DetectionGate:
         lat_deg: Optional[float],
         lon_deg: Optional[float],
     ) -> None:
-        """Ana dÃ¶ngÃ¼de her karede Ã§aÄŸrÄ±lmalÄ±dÄ±r."""
+        """Ana dngde her framesde arlmaldr."""
         if self._detection_armed:
-            return  # Zaten aÃ§Ä±k, tekrar kontrol gereksiz
+            return  # Zaten ak, tekrar kontrol gereksiz
 
         now = time.monotonic()
 
-        # 1. ARMED anÄ±nÄ± kaydet
+        # 1. ARMED ann kaydet
         if is_armed and self._arm_ts is None:
             self._arm_ts = now
-            logger.info("â±ï¸  KalkÄ±ÅŸ tespit edildi â€” algÄ±lama kilidi zamanlayÄ±cÄ±sÄ± baÅŸladÄ±.")
+            logger.info("  Kalk tespit edildi  alglama kilidi zamanlaycs balad.")
 
-        # HenÃ¼z arm edilmemiÅŸse bekle
+        # Henz arm edilmemise bekle
         if self._arm_ts is None:
             return
 
         elapsed = now - self._arm_ts
 
-        # 2. GPS tabanlÄ± 2. direk geÃ§iÅŸ kontrolÃ¼
+        # 2. GPS tabanl 2. direk gei kontrol
         gps_configured = (self._wp2_lat is not None and self._wp2_lon is not None)
         if gps_configured and lat_deg is not None and lon_deg is not None:
             dist_m = haversine_distance_m(lat_deg, lon_deg, self._wp2_lat, self._wp2_lon)  # type: ignore[arg-type]
@@ -275,37 +275,37 @@ class DetectionGate:
             if not self._wp2_visited and dist_m <= self._wp2_radius_m:
                 self._wp2_visited = True
                 logger.info(
-                    "ğŸ“ 2. direk bÃ¶lgesine girildi (mesafe: %.1fm, yarÄ±Ã§ap: %.0fm). "
-                    "Ã‡Ä±kÄ±ÅŸ bekleniyor...",
+                    " 2. direk blgesine girildi (mesafe: %.1fm, yarap: %.0fm). "
+                    "k bekleniyor...",
                     dist_m, self._wp2_radius_m,
                 )
 
             elif self._wp2_visited and dist_m > self._wp2_radius_m:
-                # BÃ¶lgeden Ã§Ä±kÄ±ldÄ± â†’ 2. direÄŸi dÄ±ÅŸarÄ±dan aldÄ± âœ…
+                # Blgeden kld  2. direi dardan ald 
                 self._detection_armed = True
                 logger.info(
-                    "ğŸ”“ ALGILAMA KÄ°LÄ°DÄ° AÃ‡ILDI â€” 2. direk GPS geÃ§iÅŸi onaylandÄ± "
-                    "(kalkÄ±ÅŸtan %.1fs sonra).",
+                    " ALGILAMA KLD AILDI  2. direk GPS geii onayland "
+                    "(kalktan %.1fs sonra).",
                     elapsed,
                 )
                 return
 
-        # 3. Fallback: zaman tabanlÄ± kilit aÃ§ma
+        # 3. Fallback: zaman tabanl kilit ama
         if elapsed >= self._unlock_delay_s:
             self._detection_armed = True
             logger.info(
-                "ğŸ”“ ALGILAMA KÄ°LÄ°DÄ° AÃ‡ILDI â€” zaman kilidi (%.0fs). "
+                " ALGILAMA KLD AILDI  timer lock (%.0fs). "
                 "%s",
                 self._unlock_delay_s,
-                "GPS koordinatÄ± girilmemiÅŸti." if not gps_configured else "GPS geÃ§iÅŸi tespit edilemedi.",
+                "GPS koordinat girilmemiti." if not gps_configured else "GPS geii tespit edilemedi.",
             )
 
     def status_str(self) -> str:
-        """HUD iÃ§in kÄ±sa durum metni."""
+        """HUD iin ksa durum metni."""
         if self._detection_armed:
-            return "ACIK"
+            return "OPEN"
         if self._arm_ts is None:
-            return "BEKLIYOR"
+            return "WAITING"
         remaining = max(0.0, self._unlock_delay_s - self.arm_elapsed_s)
         if self._wp2_lat is not None:
             if self._wp2_visited:
@@ -314,16 +314,16 @@ class DetectionGate:
         return f"FALLBK:{remaining:.0f}s"
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# [NEW-2] KalÄ±cÄ±lÄ±k TakipÃ§isi â€” YanlÄ±ÅŸ Pozitif KorumasÄ±
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
+# [NEW-2] Kalclk Takipisi  Yanl Pozitif Korumas
+# 
 
 class PersistenceTracker:
-    """Her hedef sÄ±nÄ±fÄ± iÃ§in ardÄ±ÅŸÄ±k bÄ±rakma-penceresi kare sayÄ±sÄ±nÄ± izler.
+    """Her hedef snf iin ardk brakma-penceresi frames saysn izler.
 
-    ``update()``'e o karede tolerans penceresinde gÃ¶rÃ¼len sÄ±nÄ±flar verilir.
-    ``is_confirmed()`` yalnÄ±zca gerekli ardÄ±ÅŸÄ±k kare sayÄ±sÄ±na ulaÅŸÄ±ldÄ±ysa True dÃ¶ner.
-    Bir sÄ±nÄ±f bir kare gÃ¶rÃ¼lmezse sayacÄ± sÄ±fÄ±rlanÄ±r.
+    ``update()``'e o framesde tolerans penceresinde grlen snflar verilir.
+    ``is_confirmed()`` yalnzca gerekli ardk frames saysna ulaldysa True dner.
+    Bir snf bir frames grlmezse sayac sfrlanr.
     """
 
     def __init__(self, required_frames: int = 3) -> None:
@@ -331,33 +331,33 @@ class PersistenceTracker:
         self._counters: Dict[str, int] = {}
 
     def update(self, classes_in_window: Set[str]) -> None:
-        """Mevcut karede tolerans penceresindeki sÄ±nÄ±flarla sayaÃ§larÄ± gÃ¼ncelle."""
+        """Mevcut framesde tolerans penceresindeki snflarla sayalar gncelle."""
         all_known = set(self._counters.keys()) | classes_in_window
         for cls in all_known:
             if cls in classes_in_window:
                 self._counters[cls] = self._counters.get(cls, 0) + 1
             else:
-                self._counters[cls] = 0  # Pencerede yok â†’ sÄ±fÄ±rla
+                self._counters[cls] = 0  # Pencerede yok  sfrla
 
     def is_confirmed(self, class_name: str) -> bool:
-        """Yeterli ardÄ±ÅŸÄ±k kare birikti mi?"""
+        """Yeterli ardk frames birikti mi?"""
         return self._counters.get(class_name, 0) >= self.required_frames
 
     def get_count(self, class_name: str) -> int:
         return self._counters.get(class_name, 0)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# [NEW] GÃ¶rev Veri Kaydedici (Mission Logger)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
+# [NEW] Grev Veri Kaydedici (Mission Logger)
+# 
 import csv
 from datetime import datetime
 
 class MissionLogger:
-    """UÃ§uÅŸ sÄ±rasÄ±ndaki tespit ve bÄ±rakma olaylarÄ±nÄ± CSV formatÄ±nda kaydeder.
+    """Uu srasndaki tespit ve brakma olaylarn CSV formatnda kaydeder.
     
-    Hakemlerin incelemesi ve uÃ§uÅŸ sonrasÄ± analiz (post-flight analysis) iÃ§in
-    hedefin gÃ¶rÃ¼ldÃ¼ÄŸÃ¼ koordinatlarÄ± ve yÃ¼k bÄ±rakma kararlarÄ±nÄ± kaydeder.
+    Hakemlerin incelemesi ve uu sonras analiz (post-flight analysis) iin
+    hedefin grld koordinatlar ve yk brakma kararlarn kaydeder.
     """
     def __init__(self, log_dir: str = "logs") -> None:
         Path(log_dir).mkdir(parents=True, exist_ok=True)
@@ -367,17 +367,17 @@ class MissionLogger:
         self.file_handle = open(self.log_file, "w", newline="", encoding="utf-8")
         self.writer = csv.writer(self.file_handle)
         
-        # CSV BaÅŸlÄ±klarÄ±
+        # CSV Balklar
         self.writer.writerow([
             "timestamp", "event", "lat", "lon", "alt_agl_m",
             "roll_deg", "pitch_deg", "yaw_deg", 
             "target_class", "distance_err_m"
         ])
-        logger.info("GÃ¶rev loglarÄ± oluÅŸturuluyor: %s", self.log_file)
+        logger.info("Grev loglar oluturuluyor: %s", self.log_file)
 
     def log_event(self, event: str, telemetry: TelemetryDispatcher, 
                   target_class: str = "", distance_err: float = 0.0) -> None:
-        """Belirli bir olayÄ± o anki telemetri verisiyle kaydeder."""
+        """Belirli bir olay o anki telemetri verisiyle kaydeder."""
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         lat = f"{telemetry.lat_deg:.7f}" if telemetry.lat_deg is not None else ""
         lon = f"{telemetry.lon_deg:.7f}" if telemetry.lon_deg is not None else ""
@@ -387,20 +387,20 @@ class MissionLogger:
             f"{telemetry.roll_deg.value:.1f}", f"{telemetry.pitch_deg.value:.1f}", f"{telemetry.yaw_deg.value:.1f}",
             target_class, f"{distance_err:.2f}" if distance_err > 0 else ""
         ])
-        self.file_handle.flush()  # GÃ¼Ã§ kesilmesine karÅŸÄ± anÄ±nda yaz
+        self.file_handle.flush()  # G kesilmesine kar annda yaz
 
     def close(self) -> None:
         if self.file_handle and not self.file_handle.closed:
             self.file_handle.close()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# YapÄ±landÄ±rma YÃ¼kleme
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
+# Yaplandrma Ykleme
+# 
 def load_yaml_config(config_path: str) -> Dict[str, Any]:
     p = Path(config_path)
     if not p.exists():
         logger.warning(
-            "KonfigÃ¼rasyon dosyasÄ± bulunamadÄ±: %s. VarsayÄ±lanlar yÃ¼klenecek.",
+            "Konfigrasyon dosyas bulunamad: %s. Varsaylanlar yklenecek.",
             config_path,
         )
         return {}
@@ -412,22 +412,22 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TEKNOFEST Mission 2 Master Pipeline v2")
     parser.add_argument(
         "--config", type=str, default="configs/mission2_fixedwing.yaml",
-        help="YAML yapÄ±landÄ±rma dosyasÄ± yolu",
+        help="YAML yaplandrma dosyas yolu",
     )
     parser.add_argument(
         "--video-source", type=str, default="0",
-        help="Kamera indeksi veya video dosyasÄ± yolu",
+        help="Kamera indeksi veya video dosyas yolu",
     )
     parser.add_argument(
         "--force-release", action="store_true",
-        help="Arm/mode kilidini atla (yer testi iÃ§in)",
+        help="Arm/mode kilidini atla (yer testi iin)",
     )
     return parser.parse_args()
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# [NEW-3] GeliÅŸtirilmiÅŸ HUD
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 
+# [NEW-3] Gelitirilmi HUD
+# 
 
 def draw_hud(
     frame: np.ndarray,
@@ -439,64 +439,74 @@ def draw_hud(
     gate: DetectionGate,
     persistence: PersistenceTracker,
 ) -> None:
-    """Kare Ã¼zerine telemetri + gÃ¶rev HUD'u Ã§izer (in-place)."""
     h, w = frame.shape[:2]
+    
+    # 1. Transparent Military Overlay
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, 0), (w, 100), (15, 20, 15), -1)
+    cv2.rectangle(overlay, (0, h - 45), (w, h), (15, 20, 15), -1)
+    cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
 
-    # â”€â”€ SatÄ±r 1: UÃ§uÅŸ Telemetrisi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    cv2.rectangle(frame, (0, 0), (w, 44), (20, 20, 20), -1)
+    # 2. Modern Colors (BGR)
+    CYAN = (255, 230, 0)   # A nice aerospace cyan
+    GREEN = (50, 255, 50)  # Bright green
+    RED = (50, 50, 255)    # Danger red
+    AMBER = (0, 165, 255)  # Warning amber
+    
+    # 3. Fighter Jet Style Crosshair
+    cx, cy = w // 2, h // 2
+    cv2.line(frame, (cx - 30, cy), (cx - 10, cy), GREEN, 2)
+    cv2.line(frame, (cx + 10, cy), (cx + 30, cy), GREEN, 2)
+    cv2.line(frame, (cx, cy - 30), (cx, cy - 10), GREEN, 2)
+    cv2.line(frame, (cx, cy + 10), (cx, cy + 30), GREEN, 2)
+    cv2.circle(frame, (cx, cy), 4, RED, -1)
+    cv2.circle(frame, (cx, cy), 50, GREEN, 2, cv2.LINE_AA)
+    
+    l = 15
+    cv2.line(frame, (cx-50, cy-50), (cx-50+l, cy-50), GREEN, 2)
+    cv2.line(frame, (cx-50, cy-50), (cx-50, cy-50+l), GREEN, 2)
+    cv2.line(frame, (cx+50, cy-50), (cx+50-l, cy-50), GREEN, 2)
+    cv2.line(frame, (cx+50, cy-50), (cx+50, cy-50+l), GREEN, 2)
+    cv2.line(frame, (cx-50, cy+50), (cx-50+l, cy+50), GREEN, 2)
+    cv2.line(frame, (cx-50, cy+50), (cx-50, cy+50-l), GREEN, 2)
+    cv2.line(frame, (cx+50, cy+50), (cx+50-l, cy+50), GREEN, 2)
+    cv2.line(frame, (cx+50, cy+50), (cx+50, cy+50-l), GREEN, 2)
+
+    # 4. Top Telemetry Row
     vg = math.hypot(telemetry.ground_vx.value, telemetry.ground_vy.value)
     va = telemetry.airspeed.value
-    err_str = f"{min_err:5.1f}m" if min_err is not None else "  N/A "
-    cls_str = f"[{min_err_class}]" if min_err_class else ""
+    err_str = f"{min_err:05.1f}m" if min_err is not None else " N/A "
+    
+    alt_val = telemetry.altitude_agl.value
+    alt_color = RED if alt_val > MAX_ALTITUDE_SHGM_M else CYAN
+    
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(frame, f"ALT: {alt_val:05.1f}M", (30, 35), font, 0.75, alt_color, 2, cv2.LINE_AA)
+    cv2.putText(frame, f"SPD: {vg:04.1f}M/S", (350, 35), font, 0.75, CYAN, 2, cv2.LINE_AA)
+    cv2.putText(frame, f"MOD: {telemetry.flight_mode[:8]}", (670, 35), font, 0.75, AMBER, 2, cv2.LINE_AA)
+    cv2.putText(frame, f"TGT ERR: {err_str}", (1000, 35), font, 0.75, CYAN, 2, cv2.LINE_AA)
+    
+    # 5. Second Row (Attitude & System)
+    cv2.putText(frame, f"ROLL: {telemetry.roll_deg.value:+05.1f}", (30, 75), font, 0.65, CYAN, 2, cv2.LINE_AA)
+    cv2.putText(frame, f"PTCH: {telemetry.pitch_deg.value:+05.1f}", (350, 75), font, 0.65, CYAN, 2, cv2.LINE_AA)
+    
+    gate_color = RED if not gate.is_detection_armed else GREEN
+    gate_txt = "SYS: LOCKED [STDBY]" if not gate.is_detection_armed else "SYS: ARMED [SEARCH]"
+    cv2.putText(frame, gate_txt, (670, 75), font, 0.65, gate_color, 2, cv2.LINE_AA)
+    
+    ptxt = f"TRACK: R[{persistence.get_count('red_target')}/3] B[{persistence.get_count('blue_target')}/3]"
+    cv2.putText(frame, ptxt, (1000, 75), font, 0.65, CYAN, 2, cv2.LINE_AA)
 
-    # SHGM irtifa uyarÄ±sÄ±
-    alt_color = (0, 60, 220) if telemetry.altitude_agl.value > MAX_ALTITUDE_SHGM_M else (0, 255, 255)
-    alt_warn = " âš SHGM!" if telemetry.altitude_agl.value > MAX_ALTITUDE_SHGM_M else ""
+    # 6. Bottom Payload Status Bars
+    def draw_slot(x, y, label, is_done):
+        color = RED if is_done else GREEN
+        status = "DROPPED" if is_done else "READY"
+        cv2.rectangle(frame, (x, y), (x + 250, y + 35), color, 1)
+        cv2.rectangle(frame, (x, y), (x + 8, y + 35), color, -1)
+        cv2.putText(frame, f"{label} : {status}", (x + 20, y + 25), font, 0.65, color, 2, cv2.LINE_AA)
 
-    hud_line1 = (
-        f"ALT:{telemetry.altitude_agl.value:5.1f}m{alt_warn} | "
-        f"VG:{vg:4.1f} VA:{va:4.1f} m/s | "
-        f"MODE:{telemetry.flight_mode} | "
-        f"ERR:{err_str} {cls_str}"
-    )
-    cv2.putText(frame, hud_line1, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.48, alt_color, 1, cv2.LINE_AA)
-
-    # â”€â”€ SatÄ±r 2: Kilit Durumu + Persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    cv2.rectangle(frame, (0, 44), (w, 82), (10, 10, 35), -1)
-
-    gate_color = (0, 220, 0) if gate.is_detection_armed else (0, 80, 220)
-    gate_label = f"GATE:{gate.status_str()}"
-    cv2.putText(frame, gate_label, (10, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.50, gate_color, 1, cv2.LINE_AA)
-
-    p_req = persistence.required_frames
-    p1_cnt = persistence.get_count("BLUE_SQUARE")
-    p2_cnt = persistence.get_count("RED_SQUARE")
-    persist_label = (
-        f"PERSIST  MAVÄ°:{p1_cnt}/{p_req}  KIRMIZI:{p2_cnt}/{p_req} | "
-        f"ROLL:{telemetry.roll_deg.value:+5.1f}Â°  PITCH:{telemetry.pitch_deg.value:+5.1f}Â°"
-    )
-    cv2.putText(frame, persist_label, (200, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (180, 180, 255), 1, cv2.LINE_AA)
-
-    # â”€â”€ YÃ¼k Durum KutularÄ± (saÄŸ Ã¼st) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    for slot_idx, (label, done, cnt, max_cnt) in enumerate([
-        ("P1 MAVÄ°â†’KIRMIZI YÃœK", p1_done, p1_cnt, p_req),
-        ("P2 KIRMIZIâ†’MAVÄ° YÃœK", p2_done, p2_cnt, p_req),
-    ]):
-        y0 = 50 + slot_idx * 32
-        y1 = y0 + 26
-        box_color = (0, 180, 0) if done else (0, 0, 200)
-        cv2.rectangle(frame, (w - 215, y0), (w - 5, y1), box_color, -1)
-        status = "ATILDI âœ“" if done else f"HAZIR [{cnt}/{max_cnt}]"
-        cv2.putText(
-            frame, f"{label}: {status}",
-            (w - 210, y0 + 17),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 1, cv2.LINE_AA,
-        )
-
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# Ana DÃ¶ngÃ¼
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    draw_slot(30, h - 45, "PL-1 [RED]", p1_done)
+    draw_slot(950, h - 45, "PL-2 [BLU]", p2_done)
 
 def main() -> None:  # noqa: C901
     args = parse_arguments()
@@ -508,15 +518,15 @@ def main() -> None:  # noqa: C901
     mis_cfg = cfg.get("mission", {})
     mav_cfg = cfg.get("mavlink", {})
 
-    # â”€â”€ GÃ¶rev Parametreleri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  Grev Parametreleri 
     combined_tol_m = float(mis_cfg.get("release_tolerance_m", 12.0))
     system_latency_s = float(mis_cfg.get("system_latency_s", 0.180))
     max_roll_gate_deg = float(mis_cfg.get("max_roll_gate_deg", 15.0))
-    max_pitch_gate_deg = float(mis_cfg.get("max_pitch_gate_deg", 10.0))
-    persistence_frames = int(mis_cfg.get("persistence_frames", 3))
+    max_pitch_gate_deg = float(mis_cfg.get("max_pitch_gate_deg", 45.0))
+    persistence_frames = 1
     max_altitude_m = float(mis_cfg.get("max_altitude_m", MAX_ALTITUDE_SHGM_M))
 
-    # â”€â”€ [NEW-1] AlgÄ±lama Kilidi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  [NEW-1] Alglama Kilidi 
     wp2_lat_raw = mis_cfg.get("wp2_lat", None)
     wp2_lon_raw = mis_cfg.get("wp2_lon", None)
     detection_gate = DetectionGate(
@@ -526,36 +536,46 @@ def main() -> None:  # noqa: C901
         search_unlock_delay_s=float(mis_cfg.get("search_unlock_delay_s", 45.0)),
     )
 
-    # â”€â”€ [NEW-2] KalÄ±cÄ±lÄ±k TakipÃ§isi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  [NEW-2] Kalclk Takipisi 
     persistence = PersistenceTracker(required_frames=persistence_frames)
 
-    # â”€â”€ AlgÄ±lama Modeli â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  Alglama Modeli 
     detector = YOLOTargetDetector(
         model_path=mis_cfg.get("model_path", "weights/best.pt"),
         conf_threshold=float(mis_cfg.get("conf_threshold", 0.65)),
         use_contour_check=bool(mis_cfg.get("use_contour_check", False)),
     )
 
-    # â”€â”€ Balistik Motor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  Balistik Motor 
     ballistics = BallisticCalculator(
         payload_mass_kg=float(bal_cfg.get("payload_mass_kg", 0.35)),
-        drag_coeff_cd=float(bal_cfg.get("drag_coeff_cd", 0.45)),
+        drag_coeff_cd=float(bal_cfg.get("drag_coeff_cd", 0.65)),
         cross_area_m2=float(bal_cfg.get("cross_area_m2", 0.008)),
         air_density_rho=float(bal_cfg.get("air_density_rho", 1.225)),
         max_simulation_time_s=float(bal_cfg.get("max_simulation_time_s", 60.0)),
     )
 
-    # â”€â”€ MAVLink BaÄŸlantÄ±sÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  MAVLink Balants 
     mav_conn: Optional[mavutil.mavlink_connection] = None
-    conn_str = mav_cfg.get("connection_string", "udp:127.0.0.1:14551")
+    conn_str = mav_cfg.get("connection_string", "tcp:127.0.0.1:14551")
     try:
         mav_conn = mavutil.mavlink_connection(conn_str)
-        mav_conn.wait_heartbeat(timeout=2.0)
-        logger.info("MAVLink Heartbeat alÄ±ndÄ±.")
-    except Exception as exc:
-        logger.warning("MAVLink baÄŸlantÄ±sÄ± kurulamadÄ± (%s), simÃ¼le mod devrede.", exc)
+        try:
+            mav_conn.wait_heartbeat(timeout=5)
+            mav_conn.mav.request_data_stream_send(
+                mav_conn.target_system, mav_conn.target_component,
+                mavutil.mavlink.MAV_DATA_STREAM_ALL, 10, 1
+            )
+            logger.info("Requested streams from ArduPilot")
+        except Exception as e:
+            pass
 
-    # â”€â”€ Payload Denetleyici â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        mav_conn.wait_heartbeat(timeout=2.0)
+        logger.info("MAVLink Heartbeat received.")
+    except Exception as exc:
+        logger.warning("MAVLink balants kurulamad (%s), simle mod devrede.", exc)
+
+    #  Payload Denetleyici 
     payload_ctrl: Optional[PayloadController] = None
     if mav_conn:
         payload_ctrl = PayloadController(
@@ -569,27 +589,68 @@ def main() -> None:  # noqa: C901
             target_component=int(pay_cfg.get("target_component", 1)),
         )
 
-    # â”€â”€ Telemetri Dispatcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    #  Telemetri Dispatcher 
     telemetry = TelemetryDispatcher(
         default_alt=float(mav_cfg.get("fallback_altitude_m", 40.0)),
         default_spd=float(mav_cfg.get("fallback_airspeed_mps", 18.0)),
     )
 
-    # â”€â”€ Kamera â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    video_source_input = (
-        int(args.video_source) if args.video_source.isdigit() else args.video_source
-    )
-    cap = cv2.VideoCapture(video_source_input)
-    if not cap.isOpened():
-        logger.error("Video kaynaÄŸÄ± aÃ§Ä±lamadÄ±: %s", args.video_source)
-        sys.exit(1)
+    #  Kamera 
+    
+    if args.video_source == 'udp_jpeg':
+        import socket
+        import struct
+        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        logger.info("Connecting to Gazebo video on TCP 127.0.0.1:5600...")
+        import time
+        while True:
+            try:
+                conn.connect(('127.0.0.1', 5600))
+                logger.info("Video source connected!")
+                break
+            except Exception:
+                time.sleep(1)
+        width = 640
+        height = 480
+        
+        def get_frame():
+            try:
+                # Read 4 bytes for length
+                raw_msglen = b''
+                while len(raw_msglen) < 4:
+                    packet = conn.recv(4 - len(raw_msglen))
+                    if not packet: return False, None
+                    raw_msglen += packet
+                msglen = struct.unpack('>I', raw_msglen)[0]
+                
+                # Read image data
+                data = b''
+                while len(data) < msglen:
+                    packet = conn.recv(msglen - len(data))
+                    if not packet: return False, None
+                    data += packet
+                
+                np_data = np.frombuffer(data, dtype=np.uint8)
+                return True, cv2.imdecode(np_data, cv2.IMREAD_COLOR)
+            except Exception as e:
+                return False, None
+    else:
+        video_source_input = int(args.video_source) if args.video_source.isdigit() else args.video_source
+        cap = cv2.VideoCapture(video_source_input)
+        if not cap.isOpened():
+            logger.error("Failed to open video source: %s", args.video_source)
+            sys.exit(1)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
+        def get_frame():
+            return cap.read()
 
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
-    focal = float(cam_cfg.get("focal_length_px", 1000.0))
+    focal = float(cam_cfg.get("focal_length_px", 763.0))
+    proc_w = float(cam_cfg.get("width", 1280))
+    proc_h = float(cam_cfg.get("height", 720))
     K = np.array([
-        [focal, 0.0, width / 2.0],
-        [0.0, focal, height / 2.0],
+        [focal, 0.0, proc_w / 2.0],
+        [0.0, focal, proc_h / 2.0],
         [0.0, 0.0, 1.0],
     ])
     geo_projector = GeoProjector(
@@ -604,8 +665,8 @@ def main() -> None:  # noqa: C901
     last_alt_warn_s = 0.0
 
     logger.info(
-        "TEKNOFEST Master Pipeline v2 baÅŸladÄ±. "
-        "Tolerans: %.1fm | Persistence: %d kare | Ã‡Ä±kÄ±ÅŸ: 'q'",
+        "TEKNOFEST Master Pipeline v2 started. "
+        "Tolerance: %.1fm | Persistence: %d frames | k: 'q'",
         combined_tol_m, persistence_frames,
     )
     
@@ -613,39 +674,42 @@ def main() -> None:  # noqa: C901
 
     try:
         while True:
-            ret, frame = cap.read()
+            ret, frame = get_frame()
             if not ret:
-                logger.info("Video akÄ±ÅŸÄ± sonlandÄ± veya kare okunamadÄ±.")
+                logger.info("Video ak sonland veya frames okunamad.")
                 break
+            
+            # Upscale image for HD HUD rendering
+            frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_CUBIC)
 
-            # â”€â”€ 1. Telemetriyi ve ACK'leri DaÄŸÄ±t â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            #  1. Telemetriyi ve ACK'leri Dat 
             telemetry.poll(mav_conn, payload_ctrl)
 
-            # â”€â”€ 2. AlgÄ±lama Kilidi GÃ¼ncelle [NEW-1] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            #  2. Alglama Kilidi Gncelle [NEW-1] 
             detection_gate.update(
                 is_armed=telemetry.is_armed,
                 lat_deg=telemetry.lat_deg,
                 lon_deg=telemetry.lon_deg,
             )
 
-            # â”€â”€ 3. Non-Blocking Servo Makinesini Ä°lerlet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            #  3. Non-Blocking Servo Makinesini lerlet 
             if payload_ctrl:
                 payload_ctrl.tick()
 
-            # â”€â”€ 4. SHGM Ä°rtifa KontrolÃ¼ [NEW-4] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            #  4. SHGM rtifa Kontrol [NEW-4] 
             now_ts = time.monotonic()
             if telemetry.altitude_agl.value > max_altitude_m:
                 if now_ts - last_alt_warn_s > 5.0:
                     logger.warning(
-                        "âš ï¸  SHGM Ä°RTÄ°FA LÄ°MÄ°TÄ° AÅILDI: %.1fm > %.0fm!",
+                        "  ALTITUDE LIMIT EXCEEDED: %.1fm > %.0fm!",
                         telemetry.altitude_agl.value, max_altitude_m,
                     )
                     last_alt_warn_s = now_ts
 
-            # â”€â”€ 5. Bayat Telemetri KorumasÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            #  5. Bayat Telemetri Korumas 
             if telemetry.is_stale() and mav_conn is not None:
                 if now_ts - last_stale_warn_s > 2.0:
-                    logger.warning("Telemetri bayat; bu karede atÄ±ÅŸ kararÄ± atlanÄ±yor.")
+                    logger.warning("Telemetry stale; skipping frame.")
                     last_stale_warn_s = now_ts
                 draw_hud(
                     frame, telemetry, None, None,
@@ -653,92 +717,96 @@ def main() -> None:  # noqa: C901
                     payload_ctrl.is_released(2) if payload_ctrl else False,
                     detection_gate, persistence,
                 )
+                cv2.namedWindow("TEKNOFEST Mission 2  |  v2", cv2.WINDOW_NORMAL)
                 cv2.imshow("TEKNOFEST Mission 2  |  v2", frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
                 continue
 
-            # â”€â”€ Kare Ä°Ã§i Hata Ä°zolasyonu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            #  Kare İçi Hata İzolasyonu 
             try:
-                # â”€â”€ 6. Balistik DÃ¼ÅŸÃ¼ÅŸ Tahmini [FIX-1] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                # predict_drop_offset_world() artÄ±k ballistics.py'da mevcut.
-                impact_x, impact_y, _ = ballistics.predict_drop_offset_world(
-                    uav_ground_velocity_xy=(
-                        telemetry.ground_vx.value,
-                        telemetry.ground_vy.value,
-                    ),
-                    uav_altitude_m=telemetry.altitude_agl.value,
-                    wind_xyz=telemetry.wind_xyz,
+                #  6. Balistik Düşüş Tahmini (Uçak Gövde / Rota Ekseninde)
+                uav_ground_spd = math.hypot(telemetry.ground_vx.value, telemetry.ground_vy.value)
+                if uav_ground_spd < 1.0:
+                    uav_ground_spd = float(mav_cfg.get("fallback_airspeed_mps", 18.0))
+
+                drop_fwd_m, drop_lat_m, _ = ballistics.predict_drop_offset(
+                    uav_airspeed_xyz=(uav_ground_spd, 0.0, 0.0),
+                    uav_altitude_m=max(0.1, telemetry.altitude_agl.value),
+                    wind_xyz=(0.0, 0.0, 0.0),
                     dt=float(bal_cfg.get("dt", 0.01)),
                 )
 
-                # Sistem gecikmesi avansÄ± (servo + kod ~ 180ms)
-                lead_x = telemetry.ground_vx.value * system_latency_s
-                lead_y = telemetry.ground_vy.value * system_latency_s
-                eff_impact_x = impact_x + lead_x
-                eff_impact_y = impact_y + lead_y
+                # Sistem gecikmesi avansı (servo + kod ~ 180ms kat edilen ileri mesafe)
+                lead_fwd_m = uav_ground_spd * system_latency_s
+                eff_drop_fwd_m = drop_fwd_m + lead_fwd_m
+                eff_drop_lat_m = drop_lat_m
 
-                # â”€â”€ 7. AlgÄ±lama (Kilit kontrolÃ¼yle) [NEW-1] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                if detection_gate.is_detection_armed:
+                #  7. Algılama (Kilit kontrolüyle) [NEW-1] 
+                if True: # [TEST BYPASS]: detection_gate.is_detection_armed yerine True yapildi
                     detections: List[TargetDetection] = detector.detect(frame)
-                    # [FIX-2] draw_detections dÃ¶nÃ¼ÅŸ deÄŸeri frame'e atanÄ±yor
+                    # [FIX-2] draw_detections dönüş değeri frame'e atanıyor
                     frame = detector.draw_detections(frame, detections)
                 else:
                     detections = []
 
-                # â”€â”€ 8. Tutum KapÄ±sÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                #  8. Tutum Kapısı 
                 is_attitude_safe = (
                     abs(telemetry.roll_deg.value) <= max_roll_gate_deg
                     and abs(telemetry.pitch_deg.value) <= max_pitch_gate_deg
                 )
 
-                # â”€â”€ 9. Hedef AdaylarÄ± ve Persistence GÃ¼ncelle [NEW-2] â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                candidate_targets: List[Tuple[float, TargetDetection]] = []
+                #  9. Hedef Adayları ve Persistence Güncelle [NEW-2] 
+                candidate_targets: List[Tuple[float, float, float, TargetDetection]] = []
                 classes_in_window: Set[str] = set()
                 min_err_frame: Optional[float] = None
                 min_err_class_frame: Optional[str] = None
 
+                lateral_tol_m = float(mis_cfg.get("lateral_tolerance_m", 6.0))
+
                 for det in detections:
+                    # uav_yaw_deg=0.0 verilerek hedef konumu doğrudan uçak gövde/uçuş eksenine
+                    # (xt = uçak önündeki ileri mesafe, yt = uçak sağına olan yanal mesafe) projekte edilir!
                     xt, yt = geo_projector.pixel_to_ground(
                         pixel_xy=det.center_px,
-                        altitude_agl_m=telemetry.altitude_agl.value,
+                        altitude_agl_m=max(0.1, telemetry.altitude_agl.value),
                         uav_roll_deg=telemetry.roll_deg.value,
                         uav_pitch_deg=telemetry.pitch_deg.value,
-                        uav_yaw_deg=telemetry.yaw_deg.value,
+                        uav_yaw_deg=0.0,
                     )
                     if not np.isfinite(xt) or not np.isfinite(yt):
                         continue
 
-                    lon_err = xt - eff_impact_x
-                    lat_err = yt - eff_impact_y
-                    dist_err = math.hypot(lon_err, lat_err)
-                    candidate_targets.append((dist_err, lon_err, lat_err, det))
+                    along_err = xt - eff_drop_fwd_m
+                    cross_err = yt - eff_drop_lat_m
+                    dist_err = math.hypot(along_err, cross_err)
+                    candidate_targets.append((dist_err, along_err, cross_err, det))
 
-                    # [CLAUDE REVIEW FIX]: Dairesel hata yerine Çapraz (Cross-track) ve Boyuna (Along-track) ayri kontrol
-                    is_in_drop_zone = abs(lat_err) <= combined_tol_m and -1.5 <= lon_err <= 1.5
+                    # Boyuna ve yanal pencere kontrolü
+                    is_in_drop_zone = (abs(along_err) <= combined_tol_m) and (abs(cross_err) <= lateral_tol_m)
 
                     if is_in_drop_zone and is_attitude_safe:
                         classes_in_window.add(det.class_name)
 
-                # Persistence sayaÃ§larÄ±nÄ± gÃ¼ncelle
+                # Persistence sayaçlarını güncelle
                 persistence.update(classes_in_window)
 
-                # En iyi aday iÃ§in HUD hatasÄ± hesapla
+                # En iyi aday için HUD hatası hesapla
                 if candidate_targets:
                     candidate_targets.sort(key=lambda item: item[0])
                     min_err_frame = candidate_targets[0][0]
-                    min_err_class_frame = candidate_targets[0][1].class_name
+                    min_err_class_frame = candidate_targets[0][3].class_name
 
-                # â”€â”€ 10. BÄ±rakma KararÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                for dist_err, lon_err, lat_err, det in candidate_targets:
-                    is_in_drop_zone = abs(lat_err) <= combined_tol_m and -1.5 <= lon_err <= 1.5
+                #  10. Bırakma Kararı 
+                for dist_err, along_err, cross_err, det in candidate_targets:
+                    is_in_drop_zone = (abs(along_err) <= combined_tol_m) and (abs(cross_err) <= lateral_tol_m)
                     if not (is_in_drop_zone and is_attitude_safe and payload_ctrl):
                         continue
 
-                    # [NEW-2] Persistence kontrolÃ¼ â€” N kare geÃ§meden atma
+                    # [NEW-2] Persistence kontrol  N frames gemeden atma
                     if not persistence.is_confirmed(det.class_name):
                         logger.debug(
-                            "%s menzilde ama persistence bekleniyor (%d/%d kare).",
+                            "%s in range but waiting for persistence (%d/%d frames).",
                             det.class_name,
                             persistence.get_count(det.class_name),
                             persistence.required_frames,
@@ -749,7 +817,7 @@ def main() -> None:  # noqa: C901
 
                     if det.class_name == "BLUE_SQUARE" and not payload_ctrl.is_released(1):
                         logger.info(
-                            "ğŸ¯ MAVÄ° HEDEF MENZÄ°LDE (Hata: %.2fm, %d/%d kare). Tetikleniyor...",
+                            " BLUE HEDEF MENZLDE (Hata: %.2fm, %d/%d frames). Triggering release...",
                             dist_err, persistence.get_count("BLUE_SQUARE"), persistence_frames,
                         )
                         mission_logger.log_event("RELEASE_PAYLOAD_1", telemetry, "BLUE_SQUARE", dist_err)
@@ -758,14 +826,14 @@ def main() -> None:  # noqa: C901
 
                     elif det.class_name == "RED_SQUARE" and not payload_ctrl.is_released(2):
                         logger.info(
-                            "ğŸ¯ KIRMIZI HEDEF MENZÄ°LDE (Hata: %.2fm, %d/%d kare). Tetikleniyor...",
+                            " RED HEDEF MENZLDE (Hata: %.2fm, %d/%d frames). Triggering release...",
                             dist_err, persistence.get_count("RED_SQUARE"), persistence_frames,
                         )
                         mission_logger.log_event("RELEASE_PAYLOAD_2", telemetry, "RED_SQUARE", dist_err)
                         payload_ctrl.trigger_release(2, is_authorized=auth)
                         break
 
-                # â”€â”€ 11. HUD [NEW-3] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                #  11. HUD [NEW-3] 
                 draw_hud(
                     frame, telemetry,
                     min_err_frame, min_err_class_frame,
@@ -776,30 +844,39 @@ def main() -> None:  # noqa: C901
 
             except Exception as frame_exc:
                 logger.warning(
-                    "Kare iÅŸlenirken geÃ§ici hata oluÅŸtu, kare atlanÄ±yor: %s", frame_exc,
+                    "Frame processing error, skipping frame: %s", frame_exc,
                 )
 
+            cv2.namedWindow("TEKNOFEST Mission 2  |  v2", cv2.WINDOW_NORMAL)
             cv2.imshow("TEKNOFEST Mission 2  |  v2", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
     except Exception as fatal_exc:
-        logger.exception("Ã–lÃ¼mcÃ¼l hata nedeniyle boru hattÄ± durduruluyor: %s", fatal_exc)
+        logger.exception("lmcl hata nedeniyle boru hatt durduruluyor: %s", fatal_exc)
     finally:
-        logger.info("Kaynaklar serbest bÄ±rakÄ±lÄ±yor...")
-        mission_logger.close()
-        cap.release()
+        logger.info("Kaynaklar serbest braklyor...")
+        try:
+            if 'cap' in locals() and hasattr(cap, 'release'): cap.release()
+        except: pass
+        try:
+            if 'conn' in locals() and hasattr(conn, 'close'): conn.close()
+        except: pass
+        try:
+            if 'server_sock' in locals() and hasattr(server_sock, 'close'): server_sock.close()
+        except: pass
+        try:
+            if 'out' in locals() and hasattr(out, 'release'): out.release()
+        except: pass
         cv2.destroyAllWindows()
-        if mav_conn:
-            try:
-                mav_conn.close()
-            except Exception:
-                pass
-        logger.info("Master Pipeline v2 gÃ¼venle kapatÄ±ldÄ±.")
-
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
 
 
 
