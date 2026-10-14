@@ -17,6 +17,7 @@ Developed for search-and-rescue (SAR), humanitarian aid distribution, and precis
 ## Table of Contents
 
 - [Overview](#overview)
+- [Repository Structure](#repository-structure)
 - [Key Capabilities](#key-capabilities)
 - [System Architecture](#system-architecture)
 - [System Requirements](#system-requirements)
@@ -26,6 +27,24 @@ Developed for search-and-rescue (SAR), humanitarian aid distribution, and precis
 - [MAVLink & Actuator Interface](#mavlink--actuator-interface)
 - [Safety and Compliance](#safety-and-compliance)
 - [License](#license)
+
+## Repository Structure
+
+```text
+├── docs/                 # Competition documentation & official specifications
+├── mission_1/            # Mission 1: Autonomous navigation & waypoint path generator
+├── mission_2/            # Mission 2: AI target acquisition, geo-projection & ballistic drop
+│   ├── configs/          # Mission configuration files (camera, vehicle, ballistics)
+│   ├── scripts/          # Core runtime scripts (demo_pipeline.py, train_yolov8.py, etc.)
+│   ├── src/              # Scandium core modules (perception, control, ballistics, mavlink)
+│   └── ai_training/      # YOLOv8 models (best.pt), runs and training artifacts
+├── simulation/           # ArduPilot SITL & Gazebo simulation environment
+│   ├── models/           # Aircraft models (Cessna, Techpod with downward camera)
+│   ├── scripts/          # SITL and Gazebo launcher scripts
+│   ├── setup/            # Automated simulation setup scripts
+│   └── tools/            # Simulation diagnostics, patches and SITL bridge tools
+└── README.md
+```
 
 ## Key Capabilities
 
@@ -118,8 +137,8 @@ flowchart TB
 
 ```bash
 # Clone the repository
-git clone [https://github.com/emrealtindag/scandium.git](https://github.com/emrealtindag/scandium.git)
-cd scandium
+git clone https://github.com/emrealtindag/fixedwing-ballistic-drop.git
+cd fixedwing-ballistic-drop
 
 # Install dependencies via Poetry
 poetry install --with dev
