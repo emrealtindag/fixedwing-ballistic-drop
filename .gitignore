@@ -23,3 +23,18 @@ px4_gazebo_repo/
 Thumbs.db
 .vscode/
 .idea/
+
+# ==============================================================================
+# Proprietary TEKNOFEST Core Intellectual Property (Protected In-House)
+# ==============================================================================
+# Trained Model Weights & Datasets
+*.pt
+*.onnx
+*.engine
+mission_2/ai_training/dataset/
+
+# Proprietary Trajectory, Geo-Projection & Tracking Algorithms
+mission_2/src/scandium/control/ballistics.py
+mission_2/src/scandium/perception/geo_projection.py
+mission_2/src/scandium/perception/tracker.py
+mission_2/scripts/generate_synthetic_data.py
