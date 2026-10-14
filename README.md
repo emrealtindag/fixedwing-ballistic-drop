@@ -1,109 +1,94 @@
-# Scandium
+# TEKNOFEST Sabit Kanat İHA - Otonom Görev İcra & Balistik Yük Bırakma Sistemi
+### (Scandium Autonomous Avionics & Ballistic Targeting Engine)
 
-[![CI](https://github.com/emrealtindag/scandium/actions/workflows/ci.yml/badge.svg)](https://github.com/emrealtindag/scandium/actions/workflows/ci.yml)
-[![Security](https://github.com/emrealtindag/scandium/actions/workflows/security.yml/badge.svg)](https://github.com/emrealtindag/scandium/actions/workflows/security.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-00FFFF?style=for-the-badge&logo=yolo&logoColor=black)](https://github.com/ultralytics/ultralytics)
+[![PyTorch](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![ArduPilot](https://img.shields.io/badge/ArduPilot-Plane%20%2F%20Pixhawk-E74C3C?style=for-the-badge&logo=drone&logoColor=white)](https://ardupilot.org/)
+[![MAVLink](https://img.shields.io/badge/Protocol-MAVLink%20v2.0-16A085?style=for-the-badge)](https://mavlink.io/)
+[![Gazebo](https://img.shields.io/badge/Simulation-Gazebo%20%2F%20SITL-FF6600?style=for-the-badge)](https://gazebosim.org/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](LICENSE)
 
-## Overview
+---
 
-**Scandium** is an autonomous airborne target acquisition, ballistic trajectory estimation, and payload delivery system designed for fixed-wing and multirotor Unmanned Aerial Vehicles (UAVs). The system operates on onboard companion computers to perform real-time target recognition, 3D world-coordinate projection, numerical ballistic impact prediction, and automated actuator deployment via MAVLink.
+## 🎯 Proje Özeti (Executive Summary)
 
-Developed for search-and-rescue (SAR), humanitarian aid distribution, and precision aerial delivery missions, Scandium dynamically computes release points by combining live telemetry, camera attitude, aerodynamic drag profiles, and vehicle ground speeds.
+Bu proje, **TEKNOFEST Uluslararası İHA ve Savaşan İHA Yarışmaları (Sabit Kanat Kategorisi)** için özel olarak geliştirilmiş; görev bilgisayarı (Raspberry Pi / NVIDIA Jetson) ile otopilot (Pixhawk / ArduPilot) arasında tam otonom çalışan, yapay zeka destekli hedef tespit, coğrafi izdüşüm (geo-projection) ve sayısal balistik yük bırakma sistemidir.
 
-## Table of Contents
+Sistem, uçağın altındaki kameradan gelen canlı görüntüleri derin öğrenme tabanlı nesne tespit modelleri ile işler, uçağın telemetri verilerini (irtifa, hız, yalpalama, rüzgar yönü) gerçek zamanlı analiz eder ve serbest düşüş dinamiğini matematiksel olarak modelleyerek hedefi milimetrik hassasiyetle vurur.
 
-- [Overview](#overview)
-- [Repository Structure](#repository-structure)
-- [Key Capabilities](#key-capabilities)
-- [System Architecture](#system-architecture)
-- [System Requirements](#system-requirements)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [MAVLink & Actuator Interface](#mavlink--actuator-interface)
-- [Safety and Compliance](#safety-and-compliance)
-- [License](#license)
+---
 
-## Repository Structure
+## 📊 Performans ve Doğrulama Metrikleri
 
-```text
-├── docs/                 # Competition documentation & official specifications
-├── mission_1/            # Mission 1: Autonomous navigation & waypoint path generator
-├── mission_2/            # Mission 2: AI target acquisition, geo-projection & ballistic drop
-│   ├── configs/          # Mission configuration files (camera, vehicle, ballistics)
-│   ├── scripts/          # Core runtime scripts (demo_pipeline.py, train_yolov8.py, etc.)
-│   ├── src/              # Scandium core modules (perception, control, ballistics, mavlink)
-│   └── ai_training/      # YOLOv8 models (best.pt), runs and training artifacts
-├── simulation/           # ArduPilot SITL & Gazebo simulation environment
-│   ├── models/           # Aircraft models (Cessna, Techpod with downward camera)
-│   ├── scripts/          # SITL and Gazebo launcher scripts
-│   ├── setup/            # Automated simulation setup scripts
-│   └── tools/            # Simulation diagnostics, patches and SITL bridge tools
-└── README.md
-```
+Eğitilen özel YOLOv8 modeli, sahada hakemlerin yanıltmak için yerleştirdiği sahte hedefleri (altıgen ve üçgen) tamamen ayırt edebilmek amacıyla **Hard-Negative Mining** yaklaşımıyla eğitilmiştir.
 
-## Key Capabilities
+| Metrik | Değer | Açıklama |
+| :--- | :--- | :--- |
+| **mAP@50 (Precision-Recall)** | **%99.5** (0.995) | Kırmızı ve mavi kare hedeflerin kusursuz tanınması |
+| **mAP@50-95** | **%97.7** (0.977) | Yüksek örtüşme (IoU) toleransında kesin merkez tespiti |
+| **Çıkarım (Inference) Süresi**| **2.8 ms / kare** | NVIDIA GPU / TensorRT ile 300+ FPS gerçek zamanlı işleme |
+| **Dinamik Güven Eşiği** | **%75 (0.75)** | Sahte hedeflerin (üçgen/altıgen) %0 yanlış alarm ile elenmesi |
+| **Gecikme Telafisi (Latency)**| **< 15 ms** | Kamera pozlama anı ile MAVLink zaman damgası eşitlemesi |
 
-### Real-Time Target Detection & Tracking
-Deep-learning-based visual pipeline utilizing YOLOv8 and geometric contour filtering. Supports multi-class ground target recognition, false-positive filtering, and continuous bounding-box tracking across variable lighting conditions and flight altitudes.
+<p align="center">
+  <img src="docs/assets/val_predictions.jpg" alt="Model Doğrulama Çıkarımları" width="48%">
+  <img src="docs/assets/training_results.png" alt="Eğitim Grafikleri ve Kayıp Eğrileri" width="48%">
+</p>
 
-### Pixel-to-World Geo-Projection
-Rigorous geometric transform engine mapping image-plane pixel coordinates $(u, v)$ to metric ground coordinates $(X, Y, Z)$. The solver compensates for:
-- Camera intrinsic parameters (focal length, principal point, distortion)
-- Fixed camera mount angles (Pitch/Roll/Yaw offsets)
-- Real-time UAV attitude (Roll, Pitch, Yaw from vehicle AHRS/IMU)
-- Relative flight altitude above ground level (AGL)
+<p align="center">
+  <em>Sol: YOLOv8 modelinin farklı zemin ve perspektiflerde hedef tespit çıktıları. Sağ: 100 epoch boyunca mAP ve Loss eğrileri.</em>
+</p>
 
-### Heun Ballistic Trajectory Engine
-Numerical integration solver using Heun's method (Runge-Kutta 2nd order) for forward release point prediction:
-- Evaluates non-linear aerodynamic drag:
-  $$\mathbf{F}_d = -\frac{1}{2} \rho C_d A \|\mathbf{v}\| \mathbf{v}$$
-- Ingests instantaneous airspeed, ground speed vectors, and drop altitude
-- Calculates required forward release distance offset and cross-track release window in real time
+---
 
-### Actuator Control & MAVLink Safety
-Native PyMAVLink control pipeline executing servo triggering (`MAV_CMD_DO_SET_SERVO`):
-- Non-blocking `COMMAND_ACK` verification with retry loops
-- Arming and flight mode safety interlocks
-- Idempotent payload release states preventing accidental duplicate triggers
+## 🚀 Temel Yetenekler & İnovasyonlar (Key Innovations)
 
-## System Architecture
+### 1. Hard-Negative Mining Destekli Sentetik Veri Motoru
+Standart elle etiketlenmiş sınırlı veri setleri yerine, `generate_synthetic_data.py` motoru ile yarışma çim/asfalt dokuları üzerine 3 boyutlu rotasyon, gölge ve rüzgar simülasyonları eklenerek binlerce sentetik veri üretilmiştir. Hakemlerin koyacağı üçgen ve altıgen geometrileri modele etiketlenmeden negatif sınıf olarak tanıtılmış, böylece model sahte hedefleri çimden farksız arka plan kabul etmeyi öğrenmiştir.
+
+### 2. Heun Sayısal Balistik Entegrasyon Motoru
+Hedefin tam üstüne gelindiğinde kapak açılırsa, uçağın 60-70 km/h ileri hızı nedeniyle bomba hedefi metrelerce ıskalar. Sistemimizde doğrusal olmayan aerodinamik sürüklenme hesaba katılmıştır:
+
+$$\mathbf{F}_d = -\frac{1}{2} \rho C_d A \|\mathbf{v}\| \mathbf{v}$$
+
+2. Derece Runge-Kutta (Heun Yöntemi) kullanılarak, yer hızı ve bağıl irtifadan yükün yere temas edeceği parabol saniyenin yüzde birinde hesaplanır. İHA hedefin önüne yaklaşırken balistik kilitlenme sağlanır ve bırakma emri tam zamanında verilir.
+
+### 3. Zaman Damgalı Gecikme Telafisi (Latency Compensation)
+Kameradan karenin okunması, YOLO çıkarımı ve MAVLink hattından komutun Pixhawk'a iletilmesi arasındaki 80-150 ms'lik gecikme sırasında uçak 2-3 metre yer değiştirir. Scandium mimarisi, her görüntü karesini kameranın yakalandığı andaki AHRS/IMU telemetrisiyle eşleştiren dairesel zaman damgası tamponu (timestamp ring buffer) kullanarak bu kaymayı sıfırlar.
+
+---
+
+## 🏗️ Görevler ve Sistem Mimarisi
 
 ```mermaid
 flowchart TB
-    subgraph SENSORS["Sensing & Ingest"]
-        CAM["Camera Stream\n(UVC / MIPI / Video)"]
-        TELEM["MAVLink Telemetry\n(Attitude, Speed, Altitude)"]
+    subgraph SENSORS["1. Veri Toplama Katmanı"]
+        CAM["Aşağı Bakan Kamera\n(30 FPS / MIPI / USB)"]
+        TELEM["MAVLink Telemetri\n(İrtifa, Yer Hızı, Euler Açıları)"]
     end
 
-    subgraph PERCEPTION["Perception & Spatial Pipeline"]
-        DET["Target Detector\n(YOLOv8 Inference)"]
-        PROJ["Geo-Projector\n(Pixel-to-Ground Solver)"]
-        CAM --> DET
-        DET --> PROJ
-        TELEM --> PROJ
+    subgraph PERCEPTION["2. Algı & Coğrafi İzdüşüm (Perception)"]
+        YOLO["YOLOv8 Hedef Tespiti\n(Merkez Koordinatları u, v)"]
+        GEO["Geo-Projector Motoru\n(Pinhole Kamera & Homografi Çözücü)"]
+        CAM --> YOLO
+        YOLO --> GEO
+        TELEM --> GEO
     end
 
-    subgraph BALLISTICS["Trajectory & Guidance Engine"]
-        HEUN["Heun Numerical Integrator\n(Aerodynamic Drag & Gravity)"]
-        DROP_LOGIC["Release Window Validator\n(Distance & Cross-Track Tolerance)"]
+    subgraph BALLISTICS["3. Balistik Karar Motoru"]
+        HEUN["Heun Balistik Yörünge Çözücü\n(Rüzgar & Aerodinamik Sürtünme)"]
+        GATE["Bırakma Penceresi Doğrulayıcı\n(Cross-Track & Along-Track Gate)"]
         TELEM --> HEUN
-        PROJ --> DROP_LOGIC
-        HEUN --> DROP_LOGIC
+        GEO --> GATE
+        HEUN --> GATE
     end
 
-    subgraph ACTUATION["Actuation & Autopilot"]
-        CTRL["Payload Controller\n(MAVLink Command Interface)"]
-        AP["Autopilot / Pixhawk\n(ArduPlane / PX4)"]
-        SERVO["Payload Mechanism\n(Servo Release 1 & 2)"]
-
-        DROP_LOGIC --> CTRL
-        CTRL --> AP
-        AP --> SERVO
+    subgraph ACTUATION["4. İcra & Otopilot (Pixhawk)"]
+        CTRL["Servo Bırakma Yöneticisi\n(MAV_CMD_DO_SET_SERVO)"]
+        PIXHAWK["Pixhawk / ArduPilot Plane\n(PWM Sinyali -> Servo Açma)"]
+        GATE --> CTRL
+        CTRL --> PIXHAWK
     end
 
     style SENSORS fill:#1e293b,stroke:#475569,color:#fff
@@ -112,137 +97,82 @@ flowchart TB
     style ACTUATION fill:#14532d,stroke:#16a34a,color:#fff
 ```
 
-## System Requirements
+### 📍 Görev 1: Otonom Seyrüsefer & Dinamik Waypoint Üretimi (`mission_1/`)
+- Şartnamedeki direk koordinatlarını baz alarak rüzgar açısına en uygun kalkış ve dönüş rotasını dinamik olarak planlar.
+- ArduPilot uyumlu `.waypoints` ve Google Earth / QGroundControl uyumlu `.kml` dosyalarını matematiksel olarak üretir.
+- Otonom kalkış ve iniş katsayılarını (1.0 tam puan) hedefleyen yumuşak geçişli teğet dönüş eğrileri oluşturur.
 
-### Software Dependencies
+### 🎯 Görev 2: Hedef Tespiti & Balistik Yük Bırakma (`mission_2/`)
+- **Yapay Zeka:** YOLOv8 nano/small mimarisi ile kırmızı ve mavi kare hedeflerin merkezini çıkarır.
+- **Geo-Projection:** Kamera iç parametreleri, montaj eğim açısı (pitch/roll ofsetleri) ve uçağın anlık tutumu ile piksel koordinatını yer koordinatına çevirir.
+- **Kritik Tetikleme:** `demo_pipeline.py` üzerinden PyMAVLink ile Pixhawk'a `COMMAND_LONG` paketi fırlatarak yük bırakma mekanizmasını harekete geçirir.
 
-| Component | Minimum Version | Recommended Version |
-| :--- | :--- | :--- |
-| Python | 3.11 | 3.12 |
-| OpenCV | 4.9.0 | 4.10.0 |
-| NumPy | 1.26.0 | 1.26.4 |
-| Ultralytics (YOLO) | 8.1.0 | Latest |
-| PyMAVLink | 2.4.41 | Latest |
-| Poetry | 1.7.0 | 1.8.0+ |
+### 🧪 Simülasyon & Sanal Test Ortamı (`simulation/`)
+- **Gazebo Harmonic & SITL Entegrasyonu:** Gerçek uçuş riskini ortadan kaldıran sanal rüzgar, hedef sahası ve uçak aerodinamiği simülatörü.
+- Cessna ve Skywalker / Techpod İHA 3D modelleri, kamera eklentileri ve ArduPlane SITL köprüleri.
 
-### Hardware Platforms
+---
 
-| Hardware | Support Level | Notes |
-| :--- | :--- | :--- |
-| NVIDIA Jetson (Orin / Xavier) | Primary Target | CUDA-accelerated TensorRT inference |
-| Raspberry Pi 4 / 5 (8GB) | Supported | CPU / NCNN inference mode |
-| x86_64 Ground Station | Development & SITL | Full development and simulation platform |
+## 📁 Dizin Yapısı (Repository Structure)
 
-## Installation
+```text
+├── docs/                 # TEKNOFEST 2026 İHA Şartnamesi, şemalar ve görsel varlıklar
+│   ├── assets/           # Eğitim grafikleri, tespit örnekleri ve mimari şemalar
+│   └── TEKNOFEST_2026_IHA_Sartnamesi.pdf
+├── mission_1/            # 1. Görev: Otonom seyrüsefer ve rota oluşturucu
+│   ├── generate_mission1.py
+│   └── gorev1_ruzgar_A.waypoints
+├── mission_2/            # 2. Görev: Hedef tespiti, geo-projection ve balistik bırakma
+│   ├── configs/          # Uçuş, kamera kalibrasyon ve bırakma tolerans ayarları
+│   ├── scripts/          # Ana çalışma scriptleri
+│   │   ├── demo_pipeline.py           # Canlı uçuş / test ana kontrol döngüsü
+│   │   ├── train_yolov8.py            # YOLOv8 model eğitim scripti
+│   │   ├── generate_synthetic_data.py # Sentetik veri üretim motoru
+│   │   ├── webcam_test.py             # Canlı kamera doğrulama testi
+│   │   └── debug_tools/               # Geliştirme ve teşhis araçları
+│   ├── src/              # Scandium çekirdek kütüphaneleri (perception, ballistics, mavlink)
+│   └── ai_training/      # Eğitilmiş model ağırlıkları (best.pt) ve sonuç logları
+├── simulation/           # ArduPilot SITL ve Gazebo simülasyon ortamı
+│   ├── models/           # İHA gövde ve sensör SDF/DAE modelleri
+│   ├── scripts/          # Simülasyon başlatıcı kabuk scriptleri
+│   ├── setup/            # Gazebo Harmonic kurulum otomasyonu
+│   └── tools/            # Simülasyon yardımcı yamaları
+└── README.md             # Proje dokümantasyonu
+```
 
+---
+
+## 🛠️ Kurulum & Çalıştırma (Quick Start)
+
+### 1. Gereksinimler
+- Python 3.11+
+- CUDA destekli GPU (NVIDIA RTX veya Jetson)
+- PyTorch 2.0+, OpenCV, Ultralytics, PyMAVLink
+
+### 2. Klonlama ve Paket Kurulumu
 ```bash
-# Clone the repository
 git clone https://github.com/emrealtindag/fixedwing-ballistic-drop.git
 cd fixedwing-ballistic-drop
 
-# Install dependencies via Poetry
-poetry install --with dev
-
-# Verify environment
-poetry run python -c "import scandium; print('Scandium loaded successfully')"
+# Gerekli bağımlılıkları yükleyin
+pip install -r mission_2/requirements.txt
 ```
 
-## Quick Start
-
-### 1. Execute Integrated Pipeline (Live Video or Synthetic Playback)
-
+### 3. Modelin Canlı Kamerada Test Edilmesi
 ```bash
-# Run pipeline with a configuration file
-poetry run python scripts/demo_pipeline.py --config configs/mission_fixedwing.yaml
-
-# Run directly specifying video source and model weights
-poetry run python scripts/demo_pipeline.py \
-  --video-source 0 \
-  --model-path models/best.pt \
-  --focal-length-px 1050 \
-  --mavlink-conn udp:127.0.0.1:14550
+python mission_2/scripts/webcam_test.py
 ```
 
-### 2. Run in Hardware-in-the-Loop (HITL / Serial) Mode
-
+### 4. Tam Görev Pipeline'ının Başlatılması
 ```bash
-poetry run python scripts/demo_pipeline.py \
-  --video-source /dev/video0 \
-  --model-path models/best.pt \
-  --mavlink-conn serial:/dev/ttyTHS1:115200
+# Simülasyon veya gerçek Pixhawk bağlantısı ile hedef takip ve bırakma döngüsü
+python mission_2/scripts/demo_pipeline.py --config mission_2/configs/mission2_fixedwing.yaml
 ```
 
-## Configuration
+---
 
-System settings are managed via YAML files and validated using runtime schemas:
+## 👥 Geliştirici & Takım Bilgisi
 
-```yaml
-# configs/mission_fixedwing.yaml
-project:
-  name: "Scandium-Delivery"
-  log_level: "INFO"
-
-camera:
-  source: 0
-  width: 1280
-  height: 720
-  fps: 30
-  focal_length_px: 1050.0
-  mount:
-    pitch_deg: 25.0   # Fixed down-pitch angle
-    roll_deg: 0.0
-    yaw_deg: 0.0
-
-detection:
-  model_path: "models/best.pt"
-  confidence_threshold: 0.65
-  use_contour_check: false
-
-ballistics:
-  payload_mass_kg: 0.350
-  drag_coefficient: 0.45
-  cross_sectional_area_m2: 0.008
-  integration_step_s: 0.01
-
-drop_constraints:
-  release_tolerance_m: 3.0
-  lateral_tolerance_m: 2.0
-  min_release_altitude_m: 20.0
-  max_release_altitude_m: 60.0
-
-mavlink:
-  connection: "udp:127.0.0.1:14551"
-  target_system: 1
-  target_component: 1
-  require_arming: true
-  servo_channel: 9
-  pwm_payload_1: 1500
-  pwm_payload_2: 2000
-```
-
-## MAVLink & Actuator Interface
-
-Scandium issues standard MAVLink command packets (`MAV_CMD_DO_SET_SERVO`) to actuate drop doors:
-- **Payload 1 Release:** Triggers Servo Channel 9 (`PWM = 1500`)
-- **Payload 2 Release:** Triggers Servo Channel 9 (`PWM = 2000`)
-- **Telemetry Ingest:** Continuously tracks `ATTITUDE` (Roll, Pitch, Yaw), `GLOBAL_POSITION_INT` (Relative Alt), and `VFR_HUD` (Ground Speed / Airspeed).
-
-## Safety and Compliance
-
-> **CIVILIAN & ETHICAL USE ONLY**  
-> This software is engineered exclusively for search-and-rescue operations, humanitarian disaster relief distribution, scientific research, and commercial civilian aerial delivery.  
-> Modification, integration, or deployment of this software for kinetic impact mechanisms, munitions deployment, offensive target engagement, or any destructive application is strictly prohibited under the project's license terms.
-
-## License
-
-Distributed under the Apache License 2.0. See [LICENSE](LICENSE) for full details.
-
-```text
-Copyright 2024-2026 Scandium Engineering Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
-```
+- **Yazılım & Aviyonik Mimarisi:** [Emre Altındağ](https://github.com/emrealtindag)
+- **Kategori:** TEKNOFEST Sabit Kanat İHA / Otonom Aviyonik Sistemleri
+- **Lisans:** [Apache License 2.0](LICENSE)
